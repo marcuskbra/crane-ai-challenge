@@ -1,0 +1,105 @@
+# Python-generated files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+virtual/
+.virtualenv/
+
+# Testing & Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+*.log
+.hypothesis/
+.benchmarks/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+# Environment files
+.env
+.env.*
+!.env.test
+!.env.example
+
+# IDE & Editor files
+.vscode/
+.idea/*
+!.idea/runConfigurations/
+*.swp
+*.swo
+*~
+.python-version
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Cache & Temporary files
+.ruff_cache/
+.cache/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Project specific
+*.db
+*.sqlite
+*.sqlite3
+logs/
+data/
+!tests/data/
+
+# Documentation
+docs/_build/
+docs/.doctrees/
+site/
+
+# Package managers
+pip-log.txt
+pip-delete-this-directory.txt
+poetry.lock
+Pipfile.lock
+
+# UV lock file (keep this for reproducible builds)
+# Comment out if you want to track uv.lock
+uv.lock
+
+# CI/CD
+.github/workflows/run/
+.gitlab-ci-local/
+
+# Security
+*.key
+*.pem
+*.crt
+*.p12
+secrets/

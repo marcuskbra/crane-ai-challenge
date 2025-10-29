@@ -1,0 +1,261 @@
+[project]
+name = "skeleton-challenge"
+version = "0.1.0"
+description = "A modern Python project with Clean Architecture"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.25.0",
+    "aiofiles>=24.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.9",
+    "pydantic-settings>=2.11.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-asyncio>=1.2.0",
+    "ruff>=0.14.2",
+    "tox>=4.32.0",
+    "tox-uv>=1.29.0",
+]
+test-integration = [
+    "pytest-httpx>=0.35.0",
+    "pytest-timeout>=2.4.0",
+    "pytest-mock>=3.15.1",
+    "faker>=37.12.0",
+    "freezegun>=1.5.5",
+]
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["challenge*"]
+
+# Tox configuration
+[tool.tox]
+requires = ["tox>=4.32.0", "tox-uv>=1.29.0"]
+env_list = [
+    "unit", "test-fast", "lint", "lint-fix", "format", "format-fix",
+    "type", "coverage", "integration", "validate", "py312"
+]
+min_version = "4.0"
+skip_missing_interpreters = true
+
+# Base configuration for all test environments
+[tool.tox.env_run_base]
+runner = "uv-venv-runner"  # Use uv for speed
+skip_install = false
+set_env = { PYTHONPATH = "{tox_root}", DOTENV_PATH = ".env.test" }
+deps = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-asyncio>=1.2.0",
+]
+allowlist_externals = ["pytest", "ruff", "python", "ty"]
+
+# Default test environment
+[tool.tox.env.testenv]
+description = "Run unit tests"
+commands = [
+    ["pytest", "tests/unit/", "-xvs", "--tb=short"]
+]
+
+# Unit tests only
+[tool.tox.env.unit]
+description = "Run unit tests - business logic without external dependencies"
+commands = [
+    ["pytest", "tests/unit/", "-xvs"]
+]
+
+# Fast test environment
+[tool.tox.env."test-fast"]
+description = "Run unit tests quickly (less verbose)"
+commands = [
+    ["pytest", "tests/unit/", "-x", "-q"]
+]
+
+# Linting environments
+[tool.tox.env.lint]
+description = "Run linter (ruff)"
+deps = ["ruff>=0.14.2"]
+commands_pre = []
+commands = [
+    ["ruff", "check", "."]
+]
+
+[tool.tox.env."lint-fix"]
+description = "Run linter and auto-fix issues"
+deps = ["ruff>=0.14.2"]
+commands_pre = []
+commands = [
+    ["ruff", "check", ".", "--fix"]
+]
+
+# Formatting environments
+[tool.tox.env.format]
+description = "Check code formatting"
+deps = ["ruff>=0.14.2"]
+commands_pre = []
+commands = [
+    ["ruff", "format", ".", "--check"]
+]
+
+[tool.tox.env."format-fix"]
+description = "Format code with ruff"
+deps = ["ruff>=0.14.2"]
+commands_pre = []
+commands = [
+    ["ruff", "format", "."]
+]
+
+# Type checking environment
+[tool.tox.env.type]
+description = "Run type checking with ty"
+deps = ["ty>=0.1.0"]
+commands_pre = []
+commands = [
+    ["ty", "check", "src/", "tests/"]
+]
+
+# Coverage environment
+[tool.tox.env.coverage]
+description = "Run tests with coverage report"
+extras = ["dev", "test-integration"]
+commands = [
+    ["pytest", "tests/",
+        "--cov=src", "--cov=challenge",
+        "--cov-report=term-missing", "--cov-report=html", "--cov-report=xml"],
+    ["python", "-c", "print('Coverage report generated in htmlcov/index.html')"]
+]
+
+# Integration tests environment
+[tool.tox.env.integration]
+description = "Run integration tests"
+extras = ["dev", "test-integration"]
+commands = [
+    ["pytest", "tests/integration/", "-xvs", "--tb=short"]
+]
+
+# Validation environment
+[tool.tox.env.validate]
+description = "Run all validation steps"
+extras = ["dev"]
+commands = [
+    ["pytest", "tests/unit/", "-x", "-q"],
+    ["ruff", "check", "."],
+    ["ruff", "format", ".", "--check"],
+    ["ty", "check", "src/", "tests/"]
+]
+
+# Python 3.12 environment
+[tool.tox.env.py312]
+description = "Run tests on Python 3.12"
+base_python = ["python3.12"]
+commands = [
+    ["pytest", "tests/unit/", "-xvs", "--tb=short"]
+]
+
+# Ruff configuration
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "PT",   # flake8-pytest-style
+    "RUF",  # ruff-specific rules
+    "PLC",  # pylint conventions
+    "S",    # flake8-bandit (security)
+    "D",    # pydocstyle (docstrings)
+    "T10",  # flake8-debugger (replaces debug-statements hook)
+]
+ignore = [
+    "E501",   # Line length handled by formatter
+    "D100",   # Missing docstring in public module (we use module-level docstrings)
+    "D104",   # Missing docstring in public package (__init__.py files have descriptions)
+    "D105",   # Missing docstring in magic method (__str__, __repr__ are self-explanatory)
+    "D107",   # Missing docstring in __init__ (not always needed)
+    "D203",   # 1 blank line required before class docstring (conflicts with D211)
+    "D212",   # Multi-line docstring summary should start at the first line (we prefer D213)
+    "S101",   # Use of assert detected (allowed in tests)
+    "S603",   # subprocess without shell=True (we control the inputs)
+    "S607",   # Starting a process with a partial executable path (we trust our environment)
+]
+fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",   # Allow assert in tests
+    "D",      # Don't require docstrings in tests
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# pytest configuration
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (may require external services)",
+    "contract: Contract tests (behavioral requirements for implementations)",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*", "*Test", "*Contract"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+relative_files = true
+parallel = true
+source = ["src", "challenge"]
+omit = ["*/tests/*", "*/__pycache__/*", "*/migrations/*"]
+data_file = ".coverage"
+
+[tool.coverage.paths]
+source = [
+    "src/",
+    "challenge/",
+    "*/src/",
+    "*/challenge/",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

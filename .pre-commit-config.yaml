@@ -1,0 +1,73 @@
+# Pre-commit hooks configuration
+# See https://pre-commit.com for more information
+#
+# To install: pre-commit install
+# To run manually: pre-commit run --all-files
+
+repos:
+  # Standard pre-commit hooks (non-Python specific)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: check-case-conflict
+        name: Check for case conflicts
+      - id: detect-private-key
+        name: Detect private keys
+
+  # Local hooks using uv commands
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: Ruff check (linting)
+        entry: uv run ruff check
+        language: system
+        types: [python]
+        pass_filenames: true
+        require_serial: false
+
+      - id: ruff-format
+        name: Ruff format check
+        entry: uv run ruff format --check
+        language: system
+        types: [python]
+        pass_filenames: true
+        require_serial: false
+
+      - id: type-check
+        name: Type checking with ty
+        entry: uv run ty check
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+        always_run: true
+
+      - id: test-unit
+        name: Run unit tests
+        entry: uv run pytest tests/unit/ -x -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+# Configuration for hooks
+default_language_version:
+  python: python3.12
+
+# Stages configuration
+default_stages: [pre-commit]
+fail_fast: false
+minimum_pre_commit_version: 3.0.0
