@@ -12,11 +12,15 @@ Example usage in routes:
         return {"app_name": settings.app_name}
 """
 
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
 
 from challenge.core.config import Settings, get_settings
+from challenge.orchestrator.orchestrator import Orchestrator
+from challenge.planner.planner import PatternBasedPlanner
+from challenge.tools.registry import get_tool_registry
 
 # ============================================================================
 # Core Dependencies
@@ -29,12 +33,6 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 # ============================================================================
 # AI Agent Runtime Dependencies
 # ============================================================================
-
-from functools import lru_cache
-
-from challenge.orchestrator.orchestrator import Orchestrator
-from challenge.planner.planner import PatternBasedPlanner
-from challenge.tools.registry import get_tool_registry
 
 
 @lru_cache

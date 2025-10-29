@@ -7,7 +7,7 @@ to safely evaluate mathematical expressions without using eval() or exec().
 
 import ast
 import operator
-from typing import Any
+from typing import Any, ClassVar
 
 from challenge.tools.base import BaseTool, ToolMetadata, ToolResult
 
@@ -29,7 +29,7 @@ class SafeCalculator(ast.NodeVisitor):
         - Numbers (integers and floats)
     """
 
-    OPERATORS = {
+    OPERATORS: ClassVar[dict[type[ast.operator], Any]] = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,

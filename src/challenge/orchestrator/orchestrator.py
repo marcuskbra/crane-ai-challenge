@@ -56,6 +56,7 @@ class Orchestrator:
         self.tools = tools if tools is not None else get_tool_registry()
         self.max_retries = max_retries
         self.runs: dict[str, Run] = {}
+        self.tasks: dict[str, asyncio.Task] = {}  # Track background tasks
 
     async def create_run(self, prompt: str) -> Run:
         """
@@ -83,7 +84,8 @@ class Orchestrator:
             self.runs[run.run_id] = run
 
             # Start async execution (don't await - returns immediately)
-            asyncio.create_task(self._execute_run(run.run_id))
+            task = asyncio.create_task(self._execute_run(run.run_id))
+            self.tasks[run.run_id] = task
 
             return run
 

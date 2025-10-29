@@ -78,14 +78,14 @@ async def create_run(request: RunCreate, orchestrator: OrchestratorDep) -> Run:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid prompt: {e!s}",
-        )
+        ) from e
     except Exception as e:
         # Unexpected error
         logger.error(f"Failed to create run: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create run: {e!s}",
-        )
+        ) from e
 
 
 @router.get(
