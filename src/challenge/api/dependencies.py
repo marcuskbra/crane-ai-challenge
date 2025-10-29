@@ -19,6 +19,7 @@ from fastapi import Depends
 
 from challenge.core.config import Settings, get_settings
 from challenge.orchestrator.orchestrator import Orchestrator
+from challenge.planner.llm_planner import LLMPlanner
 from challenge.planner.planner import PatternBasedPlanner
 from challenge.tools.registry import get_tool_registry
 
@@ -38,16 +39,24 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 @lru_cache
 def get_orchestrator() -> Orchestrator:
     """
-    Get cached orchestrator instance.
+    Get cached orchestrator instance with LLM planner.
 
-    Returns singleton orchestrator with default planner and tools.
+    Returns singleton orchestrator with LLM planner (with pattern-based fallback) and tools.
+    This hybrid approach provides:
+    - Intelligent planning for complex requests via LLM
+    - Automatic fallback to pattern-based on LLM failures
+    - Cost optimization with GPT-4o-mini
+    - Reliability through graceful degradation
 
     Returns:
         Orchestrator instance
 
     """
+    # Use LLM planner with pattern-based fallback for production resilience
+    planner = LLMPlanner(model="gpt-4o-mini", fallback=PatternBasedPlanner())
+
     return Orchestrator(
-        planner=PatternBasedPlanner(),
+        planner=planner,
         tools=get_tool_registry(),
     )
 

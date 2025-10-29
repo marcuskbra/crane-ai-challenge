@@ -103,3 +103,6 @@ uv.lock
 *.crt
 *.p12
 secrets/
+/.serena/
+/.claude/
+/.qodo/

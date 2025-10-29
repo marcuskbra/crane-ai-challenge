@@ -90,8 +90,14 @@ async def async_client():
 @pytest.fixture
 def test_client():
     """Create a FastAPI test client for API endpoint testing."""
+    from functools import lru_cache  # noqa: PLC0415
+
+    from challenge.api.dependencies import get_orchestrator  # noqa: PLC0415
     from challenge.api.main import create_app  # noqa: PLC0415
     from challenge.core.config import Settings  # noqa: PLC0415
+    from challenge.orchestrator.orchestrator import Orchestrator  # noqa: PLC0415
+    from challenge.planner.planner import PatternBasedPlanner  # noqa: PLC0415
+    from challenge.tools.registry import get_tool_registry  # noqa: PLC0415
 
     # Create test settings
     test_settings = Settings(
@@ -102,8 +108,24 @@ def test_client():
     )
 
     app = create_app(settings=test_settings)
+
+    # Override orchestrator to use pattern-based planner (no LLM calls in tests)
+    # Use lru_cache to ensure singleton behavior (runs are stored in orchestrator)
+    @lru_cache
+    def get_test_orchestrator() -> Orchestrator:
+        """Test orchestrator with pattern-based planner only (no LLM)."""
+        return Orchestrator(
+            planner=PatternBasedPlanner(),
+            tools=get_tool_registry(),
+        )
+
+    app.dependency_overrides[get_orchestrator] = get_test_orchestrator
+
     with TestClient(app) as client:
         yield client
+
+    # Clear cache after test to ensure clean state for next test
+    get_test_orchestrator.cache_clear()
 
 
 # ============================================================================
