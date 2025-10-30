@@ -6,11 +6,13 @@ with exponential backoff retry for failed steps.
 """
 
 import asyncio
+import inspect
 import logging
 from datetime import datetime, timezone
 
 from challenge.models.run import ExecutionStep, Run, RunStatus
 from challenge.planner.planner import PatternBasedPlanner
+from challenge.planner.protocol import Planner
 from challenge.tools.registry import get_tool_registry
 
 logger = logging.getLogger(__name__)
@@ -28,18 +30,11 @@ class Orchestrator:
 
     Retry strategy: Exponential backoff (1s, 2s, 4s)
 
-    Example:
-        >>> orchestrator = Orchestrator()
-        >>> run = await orchestrator.create_run("calculate 2 + 3")
-        >>> # Wait for async execution
-        >>> assert run.status == RunStatus.COMPLETED
-        >>> assert run.result == 5.0
-
     """
 
     def __init__(
         self,
-        planner: PatternBasedPlanner | None = None,
+        planner: Planner | None = None,
         tools: dict | None = None,
         max_retries: int = 3,
     ):
@@ -47,7 +42,8 @@ class Orchestrator:
         Initialize orchestrator.
 
         Args:
-            planner: Planner instance (creates default if None)
+            planner: Planner implementation (any object with create_plan method).
+                     Creates PatternBasedPlanner if None.
             tools: Tool registry dict (uses default if None)
             max_retries: Maximum retry attempts per step
 
@@ -78,8 +74,12 @@ class Orchestrator:
         run = Run(prompt=prompt)
 
         try:
-            # Generate plan
-            plan = self.planner.create_plan(prompt)
+            # Generate plan (handle both sync and async planners)
+            if inspect.iscoroutinefunction(self.planner.create_plan):
+                plan = await self.planner.create_plan(prompt)
+            else:
+                plan = self.planner.create_plan(prompt)
+
             run.plan = plan
             self.runs[run.run_id] = run
 

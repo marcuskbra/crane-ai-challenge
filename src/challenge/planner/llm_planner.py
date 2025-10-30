@@ -10,7 +10,6 @@ import logging
 from typing import Any
 
 from openai import AsyncOpenAI
-from pydantic import BaseModel
 
 from challenge.models.plan import Plan
 from challenge.planner.planner import PatternBasedPlanner
@@ -58,8 +57,9 @@ class LLMPlanner:
 
     Example:
         >>> planner = LLMPlanner(model="gpt-4o-mini")
-        >>> plan = await planner.create_plan("calculate 2+3 and add todo Buy milk")
+        >>> plan = await planner.create_plan("calculate 2+3 and add to-do Buy milk")
         >>> print(f"Tokens used: {planner.last_token_count}")
+
     """
 
     def __init__(
@@ -77,6 +77,7 @@ class LLMPlanner:
             api_key: OpenAI API key (uses env var if None)
             fallback: Fallback planner for LLM failures (creates default if None)
             temperature: Sampling temperature (low for consistency)
+
         """
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
@@ -96,6 +97,7 @@ class LLMPlanner:
 
         Raises:
             ValueError: If both LLM and fallback fail
+
         """
         try:
             # Call LLM with structured output
@@ -111,10 +113,7 @@ class LLMPlanner:
 
             # Track token usage for cost monitoring
             self.last_token_count = response.usage.total_tokens
-            logger.info(
-                f"LLM planning succeeded - tokens: {self.last_token_count}, "
-                f"model: {self.model}"
-            )
+            logger.info(f"LLM planning succeeded - tokens: {self.last_token_count}, model: {self.model}")
 
             # Parse and validate structured output
             plan_dict = json.loads(response.choices[0].message.content)
@@ -122,10 +121,7 @@ class LLMPlanner:
 
         except Exception as e:
             # Fallback to pattern-based on any failure
-            logger.warning(
-                f"LLM planning failed ({e.__class__.__name__}: {e}), "
-                f"using pattern-based fallback"
-            )
+            logger.warning(f"LLM planning failed ({e.__class__.__name__}: {e}), using pattern-based fallback")
             return self.fallback.create_plan(prompt)
 
     def _system_prompt(self) -> str:
@@ -134,6 +130,7 @@ class LLMPlanner:
 
         Returns:
             System prompt string
+
         """
         return """You are a task planning agent. Convert user requests into structured execution plans.
 
@@ -171,6 +168,7 @@ Rules:
 
         Returns:
             Dict with token count and estimated cost
+
         """
         # GPT-4o-mini pricing (as of 2024)
         cost_per_1k_tokens = 0.00015  # $0.15 per 1M tokens

@@ -1,7 +1,8 @@
 """Tests for LLM-based planner with mocked OpenAI responses."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from challenge.models.plan import Plan
 from challenge.planner.llm_planner import LLMPlanner
@@ -213,7 +214,6 @@ async def test_model_configuration(mock_openai):
 @pytest.mark.asyncio
 async def test_system_prompt_includes_tool_descriptions(mock_openai):
     """Test that system prompt includes tool documentation."""
-    mock_client = mock_openai.return_value
     planner = LLMPlanner()
     system_prompt = planner._system_prompt()
 
@@ -241,8 +241,8 @@ async def test_empty_prompt_fallback(mock_openai):
 
 @pytest.mark.asyncio
 async def test_todo_operations(mock_openai):
-    """Test LLM planning for todo operations."""
-    # Mock response for adding a todo
+    """Test LLM planning for to-do operations."""
+    # Mock response for adding a to-do
     mock_response = MagicMock()
     mock_response.choices = [
         MagicMock(

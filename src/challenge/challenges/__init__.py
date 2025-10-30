@@ -1,1 +1,0 @@
-"""Coding challenge solutions."""

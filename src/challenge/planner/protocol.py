@@ -1,0 +1,54 @@
+"""
+Planner protocol defining the interface for all planner implementations.
+
+This module uses Protocol for structural subtyping, allowing any class
+with a compatible create_plan method to be used as a planner without
+requiring explicit inheritance.
+"""
+
+from typing import Protocol
+
+from challenge.models.plan import Plan
+
+
+class Planner(Protocol):
+    """
+    Protocol defining the planner interface.
+
+    Any class implementing a create_plan method with this signature
+    can be used as a planner, regardless of inheritance hierarchy.
+
+    This follows the Dependency Inversion Principle (SOLID):
+    - Orchestrator depends on the Planner abstraction
+    - Concrete planners implement the interface independently
+    - New planners can be added without modifying orchestrator
+
+    Example:
+        >>> class MyCustomPlanner:
+        ...     async def create_plan(self, prompt: str) -> Plan:
+        ...         # Custom implementation
+        ...         return Plan(steps=[], final_goal=prompt)
+        ...
+        >>> orchestrator = Orchestrator(planner=MyCustomPlanner())
+
+    Note:
+        Both sync and async implementations are supported.
+        The orchestrator handles async planners automatically.
+
+    """
+
+    async def create_plan(self, prompt: str) -> Plan:
+        """
+        Create execution plan from natural language prompt.
+
+        Args:
+            prompt: Natural language task description
+
+        Returns:
+            Plan with ordered execution steps
+
+        Raises:
+            ValueError: If prompt is invalid or cannot be parsed
+
+        """
+        ...
