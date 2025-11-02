@@ -1,5 +1,5 @@
 """
-Command-line interface entry point for skeleton-challenge.
+Command-line interface entry point for crane-challenge.
 
 This module enables running the application via `python -m challenge`.
 It provides a simple CLI for starting the API server and other operations.
@@ -40,7 +40,7 @@ def run_api(host: str = "0.0.0.0", port: int = 8000, reload: bool = False) -> No
         reload: Enable auto-reload on code changes (development mode)
 
     """
-    logging.info("Starting skeleton-challenge API v%s", __version__)
+    logging.info("Starting crane-challenge API v%s", __version__)
     logging.info("Server: http://%s:%d", host, port)
     logging.info("API Documentation: http://%s:%d/api/docs", host, port)
 
@@ -62,14 +62,14 @@ def main() -> int:
 
     """
     parser = argparse.ArgumentParser(
-        description=f"Skeleton Challenge v{__version__} - Clean Architecture Python Project",
+        description=f"Crane Challenge v{__version__} - Clean Architecture Python Project",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     parser.add_argument(
         "--version",
         action="version",
-        version=f"skeleton-challenge {__version__}",
+        version=f"crane-challenge {__version__}",
     )
 
     parser.add_argument(
@@ -112,7 +112,7 @@ def main() -> int:
 
     # If no command provided, show help and default to API server
     if not args.command:
-        print(f"skeleton-challenge v{__version__}")
+        print(f"crane-challenge v{__version__}")
         print("\nNo command specified. Starting API server...")
         print("Use --help to see available commands\n")
         run_api()

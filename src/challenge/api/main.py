@@ -39,12 +39,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     - Resource cleanup on shutdown
     """
     # Startup
-    logger.info("Starting skeleton-challenge API v%s", __version__)
+    logger.info("Starting crane-challenge API v%s", __version__)
 
     yield
 
     # Shutdown
-    logger.info("Shutting down skeleton-challenge API")
+    logger.info("Shutting down crane-challenge API")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

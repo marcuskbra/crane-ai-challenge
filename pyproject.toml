@@ -1,5 +1,5 @@
 [project]
-name = "skeleton-challenge"
+name = "crane-challenge"
 version = "0.1.0"
 description = "A modern Python project with Clean Architecture"
 readme = "README.md"
@@ -14,6 +14,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pydantic-settings>=2.11.0",
     "openai>=1.0.0",
+    "sentence-transformers>=2.2.0",
+    "faiss-cpu>=1.7.0",
     "pytest>=8.4.2",
 ]
 
@@ -22,7 +24,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
     "pytest-asyncio>=1.2.0",
-    "ruff>=0.14.2",
+    "ruff>=0.14.3",
     "tox>=4.32.0",
     "tox-uv>=1.29.0",
 ]
@@ -88,7 +90,7 @@ commands = [
 # Linting environments
 [tool.tox.env.lint]
 description = "Run linter (ruff)"
-deps = ["ruff>=0.14.2"]
+deps = ["ruff>=0.14.3"]
 commands_pre = []
 commands = [
     ["ruff", "check", "."]
@@ -96,7 +98,7 @@ commands = [
 
 [tool.tox.env."lint-fix"]
 description = "Run linter and auto-fix issues"
-deps = ["ruff>=0.14.2"]
+deps = ["ruff>=0.14.3"]
 commands_pre = []
 commands = [
     ["ruff", "check", ".", "--fix"]
@@ -105,7 +107,7 @@ commands = [
 # Formatting environments
 [tool.tox.env.format]
 description = "Check code formatting"
-deps = ["ruff>=0.14.2"]
+deps = ["ruff>=0.14.3"]
 commands_pre = []
 commands = [
     ["ruff", "format", ".", "--check"]
@@ -113,7 +115,7 @@ commands = [
 
 [tool.tox.env."format-fix"]
 description = "Format code with ruff"
-deps = ["ruff>=0.14.2"]
+deps = ["ruff>=0.14.3"]
 commands_pre = []
 commands = [
     ["ruff", "format", "."]
@@ -260,4 +262,10 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+]
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
 ]

@@ -1,4 +1,4 @@
-# Makefile for skeleton-challenge
+# Makefile for crane-challenge
 # Modern Python project with Clean Architecture
 
 .PHONY: help install dev-install test lint lint-fix format format-fix type-check coverage validate clean run \
@@ -9,7 +9,7 @@
 # ============================================================================
 
 help: ## Show this help message
-	@echo "skeleton-challenge - Available commands:"
+	@echo "crane-challenge - Available commands:"
 	@echo ""
 	@echo "Setup & Installation:"
 	@grep -E '^(install|dev-install):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
@@ -58,7 +58,7 @@ api-prod: ## Run the API server in production mode
 	uv run uvicorn challenge.presentation.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 api-test: ## Run API tests only
-	uv run pytest tests/unit/presentation/api/ -xvs
+	$(PYTEST_ENV) uv run pytest tests/unit/presentation/api/ -xvs
 
 api-health: ## Check API health endpoint
 	@echo "Checking API health..."

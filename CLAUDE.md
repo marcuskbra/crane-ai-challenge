@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**skeleton-challenge** - A modern Python project using Clean Architecture, Python 3.12+, managed with `uv` for fast dependency management.
+**crane-challenge** - A modern Python project using Clean Architecture, Python 3.12+, managed with `uv` for fast dependency management.
 
 ## Architecture Overview
 
