@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from challenge.models.run import ExecutionStep, Run, RunStatus
 from challenge.planner.planner import PatternBasedPlanner
 from challenge.planner.protocol import Planner
-from challenge.tools.registry import get_tool_registry
+from challenge.tools.registry import ToolRegistry, get_tool_registry
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class Orchestrator:
     def __init__(
         self,
         planner: Planner | None = None,
-        tools: dict | None = None,
+        tools: ToolRegistry | None = None,
         max_retries: int = 3,
         step_timeout: float = 30.0,
     ):

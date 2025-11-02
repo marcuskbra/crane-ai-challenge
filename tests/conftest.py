@@ -8,13 +8,24 @@ import sys
 import time
 import uuid
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 from dotenv import load_dotenv
+from faiss import IndexFlatIP  # type: ignore[possibly-unbound-attribute]
 from fastapi.testclient import TestClient
+from sentence_transformers import SentenceTransformer
+
+from challenge.api.dependencies import get_orchestrator
+from challenge.api.main import create_app
+from challenge.core.config import Settings
+from challenge.orchestrator.orchestrator import Orchestrator
+from challenge.planner import SemanticCache
+from challenge.planner.planner import PatternBasedPlanner
+from challenge.tools.registry import get_tool_registry
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -90,14 +101,6 @@ async def async_client():
 @pytest.fixture
 def test_client():
     """Create a FastAPI test client for API endpoint testing."""
-    from functools import lru_cache  # noqa: PLC0415
-
-    from challenge.api.dependencies import get_orchestrator  # noqa: PLC0415
-    from challenge.api.main import create_app  # noqa: PLC0415
-    from challenge.core.config import Settings  # noqa: PLC0415
-    from challenge.orchestrator.orchestrator import Orchestrator  # noqa: PLC0415
-    from challenge.planner.planner import PatternBasedPlanner  # noqa: PLC0415
-    from challenge.tools.registry import get_tool_registry  # noqa: PLC0415
 
     # Create test settings
     test_settings = Settings(
@@ -216,6 +219,62 @@ def benchmark_timer():
             self.elapsed = time.perf_counter() - self.start_time
 
     return Timer
+
+
+@pytest.fixture(scope="session")
+def shared_embedding_model():
+    """
+    Load sentence-transformers model once for all tests.
+
+    This fixture is session-scoped to avoid loading the model multiple times,
+    which significantly speeds up cache tests (from ~49s to ~4-9s).
+    """
+    return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+
+@pytest.fixture
+def semantic_cache_factory(shared_embedding_model):
+    """
+    Factory for creating SemanticCache instances with shared model.
+
+    This factory reuses the session-scoped embedding model instead of
+    loading it fresh for each cache instance, providing ~10x speedup.
+
+    Args:
+        shared_embedding_model: Session-scoped model from shared_embedding_model fixture
+
+    Returns:
+        Function that creates SemanticCache with custom threshold
+
+    Example:
+        def test_cache(semantic_cache_factory):
+            cache = semantic_cache_factory(similarity_threshold=0.90)
+            # ... test logic
+    """
+
+    def _create_cache(similarity_threshold: float = 0.85) -> SemanticCache:
+        """Create cache with shared model for performance."""
+        # Create instance without calling __init__ to avoid model reload
+        cache = SemanticCache.__new__(SemanticCache)
+
+        # Manually initialize attributes with shared model
+        cache.similarity_threshold = similarity_threshold
+        cache.model_name = "sentence-transformers/all-MiniLM-L6-v2"
+        cache.model = shared_embedding_model  # Reuse shared model
+        cache.embedding_dim = shared_embedding_model.get_sentence_embedding_dimension()
+
+        # Initialize FAISS index
+        cache.index = IndexFlatIP(cache.embedding_dim)
+
+        # Initialize storage and metrics
+        cache.entries = []
+        cache.total_requests = 0
+        cache.cache_hits = 0
+        cache.cache_misses = 0
+
+        return cache
+
+    return _create_cache
 
 
 # ============================================================================

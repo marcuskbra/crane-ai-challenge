@@ -3,6 +3,8 @@ LLM-based planner using structured outputs for reliable agent planning.
 
 This planner uses OpenAI's structured output feature to generate valid plans
 with automatic fallback to pattern-based planning on failure.
+
+Includes few-shot prompt engineering for improved consistency and error handling.
 """
 
 import json
@@ -12,6 +14,7 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from challenge.models.plan import Plan
+from challenge.planner.examples import ALL_EXAMPLES, format_example_for_prompt
 from challenge.planner.planner import PatternBasedPlanner
 
 logger = logging.getLogger(__name__)
@@ -68,6 +71,7 @@ class LLMPlanner:
         api_key: str | None = None,
         fallback: PatternBasedPlanner | None = None,
         temperature: float = 0.1,
+        use_examples: bool = True,
     ):
         """
         Initialize LLM planner.
@@ -77,12 +81,14 @@ class LLMPlanner:
             api_key: OpenAI API key (uses env var if None)
             fallback: Fallback planner for LLM failures (creates default if None)
             temperature: Sampling temperature (low for consistency)
+            use_examples: Whether to include few-shot examples in system prompt (default: True)
 
         """
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
         self.fallback = fallback or PatternBasedPlanner()
         self.temperature = temperature
+        self.use_examples = use_examples
         self.last_token_count: int = 0
 
     async def create_plan(self, prompt: str) -> Plan:
@@ -128,11 +134,14 @@ class LLMPlanner:
         """
         System prompt defining available tools and output format.
 
+        Includes few-shot examples when use_examples is True to demonstrate
+        desired planning patterns and improve consistency.
+
         Returns:
             System prompt string
 
         """
-        return """You are a task planning agent. Convert user requests into structured execution plans.
+        base_prompt = """You are a task planning agent. Convert user requests into structured execution plans.
 
 Available Tools:
 1. calculator
@@ -161,6 +170,15 @@ Rules:
 - Use specific tool inputs (don't invent new tools)
 - Provide clear reasoning for each step
 - Number steps sequentially starting from 1"""
+
+        # Add few-shot examples if enabled
+        if self.use_examples:
+            examples_section = "\n\n---\n\nHere are examples of good planning patterns:\n\n"
+            for example in ALL_EXAMPLES:
+                examples_section += format_example_for_prompt(example) + "\n"
+            return base_prompt + examples_section
+
+        return base_prompt
 
     def get_cost_estimate(self) -> dict[str, Any]:
         """
