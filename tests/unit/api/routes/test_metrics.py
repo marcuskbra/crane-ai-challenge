@@ -288,3 +288,61 @@ async def test_metrics_endpoint_integration(test_client):
     # Verify timestamp format using typed access
     assert isinstance(metrics.timestamp, datetime)
     assert metrics.timestamp.tzinfo is not None  # Should be timezone-aware
+
+
+@pytest.mark.asyncio
+async def test_planner_metrics_included(test_client):
+    """Test that planner metrics are included in metrics response."""
+    response = test_client.get("/api/v1/metrics")
+    assert response.status_code == status.HTTP_200_OK
+
+    # Parse response with typed model
+    metrics = MetricsResponse.model_validate(response.json())
+
+    # Verify planner metrics are present
+    assert metrics.planner is not None
+    assert hasattr(metrics.planner, "total_plans_generated")
+    assert hasattr(metrics.planner, "llm_plans")
+    assert hasattr(metrics.planner, "pattern_plans")
+    assert hasattr(metrics.planner, "cached_plans")
+    assert hasattr(metrics.planner, "fallback_rate")
+    assert hasattr(metrics.planner, "avg_tokens_per_plan")
+    assert hasattr(metrics.planner, "avg_latency_ms")
+    assert hasattr(metrics.planner, "cache_hit_rate")
+
+    # Verify types and default values (before tracking is implemented)
+    assert isinstance(metrics.planner.total_plans_generated, int)
+    assert isinstance(metrics.planner.llm_plans, int)
+    assert isinstance(metrics.planner.pattern_plans, int)
+    assert isinstance(metrics.planner.cached_plans, int)
+    assert isinstance(metrics.planner.fallback_rate, float)
+    assert isinstance(metrics.planner.avg_tokens_per_plan, float)
+    assert isinstance(metrics.planner.avg_latency_ms, float)
+    assert isinstance(metrics.planner.cache_hit_rate, float)
+
+    # Verify constraints
+    assert metrics.planner.total_plans_generated >= 0
+    assert metrics.planner.llm_plans >= 0
+    assert metrics.planner.pattern_plans >= 0
+    assert metrics.planner.cached_plans >= 0
+    assert 0.0 <= metrics.planner.fallback_rate <= 1.0
+    assert metrics.planner.avg_tokens_per_plan >= 0.0
+    assert metrics.planner.avg_latency_ms >= 0.0
+    assert 0.0 <= metrics.planner.cache_hit_rate <= 1.0
+
+
+@pytest.mark.asyncio
+async def test_empty_planner_metrics_default_values(orchestrator):
+    """Test that empty planner metrics have sensible default values."""
+    # Get metrics with no activity
+    metrics = await get_metrics(orchestrator)
+
+    # Verify planner metrics default to zero/zero state
+    assert metrics.planner.total_plans_generated == 0
+    assert metrics.planner.llm_plans == 0
+    assert metrics.planner.pattern_plans == 0
+    assert metrics.planner.cached_plans == 0
+    assert metrics.planner.fallback_rate == 0.0
+    assert metrics.planner.avg_tokens_per_plan == 0.0
+    assert metrics.planner.avg_latency_ms == 0.0
+    assert metrics.planner.cache_hit_rate == 0.0

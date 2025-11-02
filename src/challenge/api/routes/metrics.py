@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends
 from challenge.api.schemas.metrics import (
     ExecutionMetrics,
     MetricsResponse,
+    PlannerMetrics,
     RunMetrics,
     RunsByStatusMetrics,
     ToolMetrics,
@@ -113,6 +114,10 @@ async def get_metrics(
         else 0.0
     )
 
+    # TODO: Implement actual planner metrics tracking in orchestrator
+    # For now, return default values (will be implemented in next step)
+    planner_metrics = PlannerMetrics()
+
     # Build typed response
     return MetricsResponse(
         timestamp=datetime.now(timezone.utc),
@@ -134,4 +139,5 @@ async def get_metrics(
             total_executions=total_steps,
             by_tool=tool_executions,
         ),
+        planner=planner_metrics,
     )
