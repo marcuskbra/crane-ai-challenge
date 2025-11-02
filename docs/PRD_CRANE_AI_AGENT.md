@@ -13,30 +13,33 @@
 ### 1.1 Project Vision
 
 Build a minimal, production-quality AI agent runtime that demonstrates:
+
 - **Intelligent task planning** from natural language
 - **Robust execution orchestration** with retry logic and state management
 - **Secure tool integration** with proper error handling
 - **Clean REST API** for interaction and monitoring
 - **Engineering excellence** through testing, documentation, and pragmatic design decisions
 
-This is a **proof-of-concept evaluation** focused on code clarity, architecture decisions, and problem-solving approach over feature completeness.
+This is a **proof-of-concept evaluation** focused on code clarity, architecture decisions, and problem-solving approach
+over feature completeness.
 
 ### 1.2 Success Criteria
 
 **Primary Goal: Achieve Tier 2 (75-85% score)**
 
-| Category | Target | Measurement |
-|----------|--------|-------------|
-| **Functional** | Core features working | POST /runs executes calculator + todo tasks |
-| **Quality** | >80% test coverage | pytest --cov report |
-| **Security** | AST-based calculator | No eval/exec, injection tests pass |
-| **Documentation** | Comprehensive README | Architecture, setup, trade-offs, limitations |
-| **Tier Achievement** | Tier 2 target | 75-85% overall score |
+| Category             | Target                | Measurement                                  |
+|----------------------|-----------------------|----------------------------------------------|
+| **Functional**       | Core features working | POST /runs executes calculator + todo tasks  |
+| **Quality**          | >80% test coverage    | pytest --cov report                          |
+| **Security**         | AST-based calculator  | No eval/exec, injection tests pass           |
+| **Documentation**    | Comprehensive README  | Architecture, setup, trade-offs, limitations |
+| **Tier Achievement** | Tier 2 target         | 75-85% overall score                         |
 
 ### 1.3 Key Stakeholders
 
 **Primary Evaluator**: Crane Engineering Team
 **Evaluation Focus**:
+
 - Code Quality (40%): Clean code, error handling, type safety, separation of concerns
 - Architecture & Design (30%): Logical structure, extensibility, appropriate patterns
 - Functionality (20%): Requirements met, API works, tools function correctly
@@ -55,13 +58,16 @@ This is a **proof-of-concept evaluation** focused on code clarity, architecture 
 ## 2. Scope & Implementation Phases
 
 ### Phase 0: Project Setup ✅ COMPLETED
+
 **Duration**: 15-20 minutes
 **Status**: Already completed with existing project structure
 
 **Entry Criteria**:
-- Clean repository or existing skeleton project
+
+- Clean repository or existing crane project
 
 **Deliverables**:
+
 - ✅ Project structure (src/, tests/, docs/)
 - ✅ Virtual environment configured
 - ✅ FastAPI foundation with /health endpoint
@@ -70,6 +76,7 @@ This is a **proof-of-concept evaluation** focused on code clarity, architecture 
 - ✅ Development tools configured (pytest, ruff, type checker)
 
 **Exit Criteria**:
+
 - Can run `python -m challenge` successfully
 - Can import from `src/` modules
 - Health endpoint responds: `curl http://localhost:8000/health`
@@ -79,16 +86,19 @@ This is a **proof-of-concept evaluation** focused on code clarity, architecture 
 ---
 
 ### Phase 1: Tool System Implementation
+
 **Duration**: 90-120 minutes
 **Priority**: CRITICAL PATH - Security Sensitive
 
 #### 1.1 Tool Interface Design
 
 **Base Tool Interface** (`src/tools/base.py`):
+
 ```python
 from abc import ABC, abstractmethod
 from typing import Any
 from pydantic import BaseModel
+
 
 class ToolResult(BaseModel):
     """Standard tool execution result"""
@@ -96,8 +106,10 @@ class ToolResult(BaseModel):
     output: Any | None = None
     error: str | None = None
 
+
 class Tool(ABC):
     """Base tool interface"""
+
     @property
     @abstractmethod
     def name(self) -> str:
@@ -127,27 +139,32 @@ class Tool(ABC):
 **File**: `src/tools/calculator.py`
 
 **Tier 1 Requirements** (Minimum Viable):
+
 - Basic operators: `+`, `-`, `*`, `/`
 - Integer arithmetic
 - Simple validation
 
 **Tier 2 Requirements** (TARGET):
+
 - ✅ Decimal numbers: `3.14 + 2.86`
 - ✅ Negative numbers: `-5 * 3`
 - ✅ Parentheses: `(10 + 5) * 2`
 - ✅ Order of operations: PEMDAS
 
 **Tier 3 Requirements** (Stretch):
+
 - Scientific functions: `sqrt`, `pow`, `sin`, `cos`, `log`
 - Constants: `pi`, `e`
 
 **🔒 CRITICAL SECURITY REQUIREMENT**:
+
 ```python
 # ⛔ FORBIDDEN: NEVER use eval() or exec()
 # ❌ BAD: result = eval(expression)  # SECURITY VULNERABILITY
 
 # ✅ REQUIRED: AST-based evaluation
 import ast
+
 
 class SafeCalculator(ast.NodeVisitor):
     """AST-based expression evaluator - NO eval/exec"""
@@ -172,6 +189,7 @@ class SafeCalculator(ast.NodeVisitor):
 ```
 
 **Input Schema**:
+
 ```json
 {
   "type": "object",
@@ -179,20 +197,28 @@ class SafeCalculator(ast.NodeVisitor):
     "expression": {
       "type": "string",
       "description": "Arithmetic expression to evaluate",
-      "examples": ["2 + 2", "(10 - 3) * 4", "-5.5 / 2"]
+      "examples": [
+        "2 + 2",
+        "(10 - 3) * 4",
+        "-5.5 / 2"
+      ]
     }
   },
-  "required": ["expression"]
+  "required": [
+    "expression"
+  ]
 }
 ```
 
 **Error Handling**:
+
 - Invalid syntax: "Invalid expression: unexpected character"
 - Division by zero: "Cannot divide by zero"
 - Unsupported operator: "Operator not supported: ^"
 - Injection attempt: "Security violation: eval not allowed"
 
 **Security Tests** (MANDATORY):
+
 ```python
 async def test_calculator_blocks_eval_injection():
     calc = CalculatorTool(tier=2)
@@ -216,6 +242,7 @@ async def test_calculator_blocks_eval_injection():
 **File**: `src/tools/todo_store.py`
 
 **State Management**:
+
 ```python
 class TodoItem(BaseModel):
     id: str
@@ -223,17 +250,21 @@ class TodoItem(BaseModel):
     completed: bool = False
     created_at: datetime
 
+
 class TodoStore:
     """In-memory todo storage"""
+
     def __init__(self):
         self._todos: dict[str, TodoItem] = {}
 ```
 
 **Tier 1 Operations** (Minimum):
+
 - `TodoStore.add`: Add new todo
 - `TodoStore.list`: List all todos
 
 **Tier 2 Operations** (TARGET):
+
 - ✅ `TodoStore.add`: Create todo with generated ID
 - ✅ `TodoStore.list`: Return all todos
 - ✅ `TodoStore.get`: Retrieve specific todo by ID
@@ -241,6 +272,7 @@ class TodoStore:
 - ✅ `TodoStore.delete`: Remove todo
 
 **Tier 3 Operations** (Stretch):
+
 - `TodoStore.update`: Modify todo title
 - `TodoStore.filter`: Filter by completed status
 - `TodoStore.search`: Search by title
@@ -249,6 +281,7 @@ class TodoStore:
 **Input Schemas**:
 
 *TodoStore.add*:
+
 ```json
 {
   "type": "object",
@@ -260,11 +293,14 @@ class TodoStore:
       "description": "Todo item title"
     }
   },
-  "required": ["title"]
+  "required": [
+    "title"
+  ]
 }
 ```
 
 *TodoStore.complete*:
+
 ```json
 {
   "type": "object",
@@ -274,11 +310,14 @@ class TodoStore:
       "description": "Todo item ID"
     }
   },
-  "required": ["id"]
+  "required": [
+    "id"
+  ]
 }
 ```
 
 **Error Handling**:
+
 - Empty title: "Title cannot be empty"
 - ID not found: "Todo not found: {id}"
 - Invalid ID format: "Invalid ID format"
@@ -306,6 +345,7 @@ class ToolRegistry:
         """List all registered tool names"""
         return list(self._tools.keys())
 
+
 # Global registry instance
 def get_registry() -> ToolRegistry:
     """Get or create global tool registry"""
@@ -321,6 +361,7 @@ def get_registry() -> ToolRegistry:
 ```
 
 **Exit Criteria**:
+
 1. ✅ Calculator evaluates `(10 + 5) * 2` = `30.0`
 2. ✅ Calculator rejects eval injection with clear error
 3. ✅ TodoStore.add returns ID, TodoStore.list retrieves it
@@ -329,6 +370,7 @@ def get_registry() -> ToolRegistry:
 6. ✅ Security check passes: `grep -r "eval\|exec" src/tools/calculator.py` returns clean
 
 **Quality Gate**:
+
 ```bash
 # Must pass before proceeding to Phase 2
 python -c "from src.tools import get_registry; assert len(get_registry().list_tools()) >= 6"
@@ -340,6 +382,7 @@ python -c "from src.tools import get_registry; assert len(get_registry().list_to
 ---
 
 ### Phase 2: Tool Testing
+
 **Duration**: 45-60 minutes
 **Priority**: HIGH - Coverage determines tier achievement
 
@@ -493,10 +536,12 @@ python -c "from src.tools import get_registry; assert len(get_registry().list_to
 import pytest
 from src.tools.todo_store import TodoStore
 
+
 @pytest.fixture
 def todo_store():
     """Provide clean TodoStore instance for testing"""
     return TodoStore()
+
 
 @pytest.fixture
 def sample_todos():
@@ -509,6 +554,7 @@ def sample_todos():
 ```
 
 **Exit Criteria**:
+
 1. ✅ All calculator tests pass: `pytest tests/unit/test_calculator.py -v`
 2. ✅ All todo store tests pass: `pytest tests/unit/test_todo_store.py -v`
 3. ✅ Security tests pass (injection attempts blocked)
@@ -517,6 +563,7 @@ def sample_todos():
 **Coverage Target**: >80% for Tier 2
 
 **Quality Gate**:
+
 ```bash
 # Must pass before proceeding
 pytest tests/unit/test_calculator.py tests/unit/test_todo_store.py -v
@@ -529,6 +576,7 @@ pytest tests/unit/test_calculator.py tests/unit/test_todo_store.py -v
 ---
 
 ### Phase 3: Planning Component
+
 **Duration**: 30-40 minutes
 **Priority**: MEDIUM - Simpler than it seems
 
@@ -537,6 +585,7 @@ pytest tests/unit/test_calculator.py tests/unit/test_todo_store.py -v
 **File**: `src/planning/planner.py`
 
 **Design Decision**: Pattern-based (Option B) chosen over LLM integration for:
+
 - ✅ Deterministic behavior (easier to test)
 - ✅ No external API dependencies
 - ✅ Fast execution
@@ -590,11 +639,13 @@ class PlanStep(BaseModel):
     input: dict[str, Any]  # Tool-specific parameters
     reasoning: str  # Human-readable explanation
 
+
 class Plan(BaseModel):
     plan_id: str  # UUID
     prompt: str  # Original user prompt
     steps: list[PlanStep]
     created_at: datetime
+
 
 class Planner:
     def __init__(self, tool_registry: ToolRegistry):
@@ -629,6 +680,7 @@ class Planner:
 ```
 
 **Input Validation**:
+
 - Empty prompt: "Prompt cannot be empty"
 - No pattern match: "Cannot understand request: {prompt}"
 - Invalid tool reference: "Tool not found: {tool_name}"
@@ -641,36 +693,36 @@ class Planner:
 Input: "calculate 2 + 2"
 Output:
 {
-  "plan_id": "abc-123",
-  "steps": [
-    {
-      "step_number": 1,
-      "tool": "Calculator",
-      "input": {"expression": "2 + 2"},
-      "reasoning": "Evaluate arithmetic expression: 2 + 2"
-    }
-  ]
+    "plan_id": "abc-123",
+    "steps": [
+        {
+            "step_number": 1,
+            "tool": "Calculator",
+            "input": {"expression": "2 + 2"},
+            "reasoning": "Evaluate arithmetic expression: 2 + 2"
+        }
+    ]
 }
 
 # Example 2: Multi-step todo
 Input: "Add a todo to buy milk and then show me all my tasks"
 Output:
 {
-  "plan_id": "def-456",
-  "steps": [
-    {
-      "step_number": 1,
-      "tool": "TodoStore.add",
-      "input": {"title": "buy milk"},
-      "reasoning": "Create new todo: buy milk"
-    },
-    {
-      "step_number": 2,
-      "tool": "TodoStore.list",
-      "input": {},
-      "reasoning": "Retrieve all todo items"
-    }
-  ]
+    "plan_id": "def-456",
+    "steps": [
+        {
+            "step_number": 1,
+            "tool": "TodoStore.add",
+            "input": {"title": "buy milk"},
+            "reasoning": "Create new todo: buy milk"
+        },
+        {
+            "step_number": 2,
+            "tool": "TodoStore.list",
+            "input": {},
+            "reasoning": "Retrieve all todo items"
+        }
+    ]
 }
 ```
 
@@ -685,6 +737,7 @@ async def test_planner_calculator():
     assert len(plan.steps) == 1
     assert plan.steps[0].tool == "Calculator"
 
+
 async def test_planner_multi_step():
     registry = get_registry()
     planner = Planner(registry)
@@ -692,6 +745,7 @@ async def test_planner_multi_step():
     assert len(plan.steps) == 2
     assert plan.steps[0].tool == "TodoStore.add"
     assert plan.steps[1].tool == "TodoStore.list"
+
 
 async def test_planner_invalid_tool():
     registry = get_registry()
@@ -701,6 +755,7 @@ async def test_planner_invalid_tool():
 ```
 
 **Exit Criteria**:
+
 1. ✅ Calculator pattern matches: "calculate 2 + 2"
 2. ✅ Todo patterns match: "add todo X", "list todos"
 3. ✅ Multi-step parsing: "X and then Y" → 2 steps
@@ -708,6 +763,7 @@ async def test_planner_invalid_tool():
 5. ✅ Invalid prompt rejection with clear error
 
 **Quality Gate**:
+
 ```bash
 python -c "from src.planning.planner import Planner; from src.tools import get_registry; p=Planner(get_registry()); plan=p.create_plan('add todo test'); print('✅ Planner OK' if plan.steps else '❌ Planner Failed')"
 ```
@@ -718,6 +774,7 @@ python -c "from src.planning.planner import Planner; from src.tools import get_r
 ---
 
 ### Phase 4: Execution Orchestrator
+
 **Duration**: 60-75 minutes
 **Priority**: HIGH - Second most complex component
 
@@ -738,6 +795,7 @@ class StepExecution(BaseModel):
     attempts: int = 0
     started_at: datetime | None = None
     completed_at: datetime | None = None
+
 
 class RunState(BaseModel):
     run_id: str
@@ -772,9 +830,9 @@ class RetryConfig:
 ```python
 class Orchestrator:
     def __init__(
-        self,
-        tool_registry: ToolRegistry,
-        retry_config: RetryConfig | None = None
+            self,
+            tool_registry: ToolRegistry,
+            retry_config: RetryConfig | None = None
     ):
         self.registry = tool_registry
         self.retry_config = retry_config or RetryConfig()
@@ -921,6 +979,7 @@ class IdempotentOrchestrator(Orchestrator):
 ```
 
 **Exit Criteria**:
+
 1. ✅ Sequential execution: Steps execute in order
 2. ✅ State tracking: Run status updated correctly
 3. ✅ Retry logic: Exponential backoff works
@@ -928,6 +987,7 @@ class IdempotentOrchestrator(Orchestrator):
 5. ✅ Run retrieval: get_run() returns correct state
 
 **Quality Gate**:
+
 ```bash
 # Manual test of orchestration
 python << 'EOF'
@@ -957,6 +1017,7 @@ EOF
 ---
 
 ### Phase 5: REST API Implementation
+
 **Duration**: 30-45 minutes
 **Priority**: MEDIUM - FastAPI foundation exists
 
@@ -969,12 +1030,15 @@ EOF
 ```python
 from pydantic import BaseModel, Field
 
+
 class CreateRunRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=1000)
+
 
 class CreateRunResponse(BaseModel):
     run_id: str
     status: str
+
 
 class RunStepResponse(BaseModel):
     step_number: int
@@ -984,6 +1048,7 @@ class RunStepResponse(BaseModel):
     status: str
     error: str | None
     attempts: int
+
 
 class GetRunResponse(BaseModel):
     run_id: str
@@ -1002,12 +1067,14 @@ from fastapi import APIRouter, HTTPException, status, Depends
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
+
 def get_orchestrator() -> Orchestrator:
     """Dependency injection for orchestrator"""
     if not hasattr(get_orchestrator, "_instance"):
         registry = get_registry()
         get_orchestrator._instance = Orchestrator(registry)
     return get_orchestrator._instance
+
 
 def get_planner() -> Planner:
     """Dependency injection for planner"""
@@ -1016,11 +1083,12 @@ def get_planner() -> Planner:
         get_planner._instance = Planner(registry)
     return get_planner._instance
 
+
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=CreateRunResponse)
 async def create_run(
-    request: CreateRunRequest,
-    planner: Planner = Depends(get_planner),
-    orchestrator: Orchestrator = Depends(get_orchestrator)
+        request: CreateRunRequest,
+        planner: Planner = Depends(get_planner),
+        orchestrator: Orchestrator = Depends(get_orchestrator)
 ):
     """
     Create and execute a new run from natural language prompt.
@@ -1058,10 +1126,11 @@ async def create_run(
             detail=f"Internal server error: {str(e)}"
         )
 
+
 @router.get("/{run_id}", response_model=GetRunResponse)
 async def get_run(
-    run_id: str,
-    orchestrator: Orchestrator = Depends(get_orchestrator)
+        run_id: str,
+        orchestrator: Orchestrator = Depends(get_orchestrator)
 ):
     """
     Get complete state of a run including execution log.
@@ -1127,19 +1196,21 @@ app.include_router(runs.router)
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
 **Error Handling Summary**:
 
-| Error Type | Status Code | Example |
-|------------|-------------|---------|
-| Invalid prompt | 400 | "Cannot understand request" |
-| Planning error | 400 | "Tool not found: InvalidTool" |
-| Run not found | 404 | "Run not found: {run_id}" |
-| Internal error | 500 | "Internal server error: {details}" |
+| Error Type     | Status Code | Example                            |
+|----------------|-------------|------------------------------------|
+| Invalid prompt | 400         | "Cannot understand request"        |
+| Planning error | 400         | "Tool not found: InvalidTool"      |
+| Run not found  | 404         | "Run not found: {run_id}"          |
+| Internal error | 500         | "Internal server error: {details}" |
 
 **Exit Criteria**:
+
 1. ✅ POST /runs creates run: Returns 201 with run_id
 2. ✅ GET /runs/{run_id} retrieves state: Returns 200 with full state
 3. ✅ GET /health works: Returns 200 with status
@@ -1147,6 +1218,7 @@ if __name__ == "__main__":
 5. ✅ Invalid run_id returns 404: Clear error message
 
 **Quality Gate**:
+
 ```bash
 # Start server
 uvicorn src.api.main:app --port 8000 &
@@ -1169,6 +1241,7 @@ pkill -f "uvicorn src.api.main:app"
 ---
 
 ### Phase 6: Integration Testing
+
 **Duration**: 45-60 minutes
 **Priority**: HIGH - Coverage gate for tier achievement
 
@@ -1184,10 +1257,12 @@ from fastapi.testclient import TestClient
 from src.api.main import app
 import time
 
+
 @pytest.fixture
 def client():
     """FastAPI test client"""
     return TestClient(app)
+
 
 async def test_full_calculator_flow(client):
     """Test complete flow: create run with calculator, retrieve result"""
@@ -1215,6 +1290,7 @@ async def test_full_calculator_flow(client):
     step = run_data["execution_log"][0]
     assert step["status"] == "completed"
     assert step["output"] == 30.0
+
 
 async def test_full_todo_flow(client):
     """Test complete flow: add todo, then list todos"""
@@ -1251,17 +1327,20 @@ async def test_full_todo_flow(client):
     assert len(list_step["output"]) >= 1
     assert any(todo["title"] == "buy milk" for todo in list_step["output"])
 
+
 async def test_retry_on_failure(client):
     """Test retry logic with simulated failure"""
     # This test requires a mock tool that fails initially then succeeds
     # Skip if time-constrained, or implement with a test-only tool
     pass
 
+
 async def test_invalid_prompt_error(client):
     """Test error handling for invalid prompt"""
     response = client.post("/runs", json={"prompt": "do something impossible"})
     assert response.status_code == 400
     assert "cannot" in response.json()["detail"].lower()
+
 
 async def test_run_not_found_error(client):
     """Test error handling for invalid run_id"""
@@ -1273,23 +1352,25 @@ async def test_run_not_found_error(client):
 #### 6.2 Coverage Analysis
 
 **Coverage Command**:
+
 ```bash
 pytest tests/ --cov=src --cov-report=html --cov-report=term
 ```
 
 **Coverage Targets**:
 
-| Module | Tier 1 | Tier 2 | Tier 3 |
-|--------|--------|--------|--------|
-| src/tools/ | >70% | >80% | >90% |
-| src/planning/ | >70% | >80% | >90% |
-| src/orchestration/ | >70% | >80% | >90% |
-| src/api/ | >60% | >75% | >85% |
-| **Overall** | **>70%** | **>80%** | **>90%** |
+| Module             | Tier 1   | Tier 2   | Tier 3   |
+|--------------------|----------|----------|----------|
+| src/tools/         | >70%     | >80%     | >90%     |
+| src/planning/      | >70%     | >80%     | >90%     |
+| src/orchestration/ | >70%     | >80%     | >90%     |
+| src/api/           | >60%     | >75%     | >85%     |
+| **Overall**        | **>70%** | **>80%** | **>90%** |
 
 **Coverage Report Location**: `htmlcov/index.html`
 
 **Coverage Improvement Strategy** (if <80%):
+
 1. Identify uncovered lines: `pytest --cov=src --cov-report=term-missing`
 2. Add tests for error paths (common gap)
 3. Test edge cases (empty inputs, boundary conditions)
@@ -1297,6 +1378,7 @@ pytest tests/ --cov=src --cov-report=html --cov-report=term
 5. Backfill missing tests for Phase 1-4 components
 
 **Exit Criteria**:
+
 1. ✅ Calculator flow test passes: Create run → retrieve result
 2. ✅ Todo flow test passes: Multi-step execution verified
 3. ✅ Error handling tests pass: 400/404 responses correct
@@ -1304,6 +1386,7 @@ pytest tests/ --cov=src --cov-report=html --cov-report=term
 5. ✅ All tests pass: `pytest tests/ -v` shows 100% pass rate
 
 **Quality Gate**:
+
 ```bash
 # Run all tests with coverage
 pytest tests/ --cov=src --cov-report=term | grep "TOTAL" | awk '{if ($4 >= 80) print "✅ Coverage OK ("$4")"; else print "⚠️ Coverage Low ("$4")"}'
@@ -1315,6 +1398,7 @@ pytest tests/ --cov=src --cov-report=term | grep "TOTAL" | awk '{if ($4 >= 80) p
 ---
 
 ### Phase 7: Documentation
+
 **Duration**: 30-45 minutes
 **Priority**: MEDIUM - 10% of evaluation, tier differentiator
 
@@ -1327,42 +1411,45 @@ pytest tests/ --cov=src --cov-report=term | grep "TOTAL" | awk '{if ($4 >= 80) p
 ```markdown
 # Crane AI Agent Runtime
 
-Minimal AI agent runtime that accepts natural language tasks, generates structured execution plans, and executes them with robust error handling and retry logic.
+Minimal AI agent runtime that accepts natural language tasks, generates structured execution plans, and executes them
+with robust error handling and retry logic.
 
 ## System Architecture
 
 ### Component Overview
 
 ```
+
 ┌─────────────┐
-│   User      │
+│ User │
 │   (curl)    │
 └──────┬──────┘
-       │ POST /runs {"prompt": "..."}
-       ▼
+│ POST /runs {"prompt": "..."}
+▼
 ┌─────────────────────────────────────┐
-│         FastAPI REST API            │
+│ FastAPI REST API │
 │  (/runs, /health)                   │
 └──────┬──────────────────────────────┘
-       │
-       ▼
+│
+▼
 ┌─────────────────────────────────────┐
-│          Planner                    │
+│ Planner │
 │  (Pattern-based NL → Plan)          │
 └──────┬──────────────────────────────┘
-       │ Plan (steps)
-       ▼
+│ Plan (steps)
+▼
 ┌─────────────────────────────────────┐
-│       Orchestrator                  │
+│ Orchestrator │
 │  (Sequential Execution + Retry)     │
 └──────┬──────────────────────────────┘
-       │
-       ▼
+│
+▼
 ┌─────────────────────────────────────┐
-│       Tool Registry                 │
-│  - Calculator (AST-based)           │
-│  - TodoStore (in-memory CRUD)       │
+│ Tool Registry │
+│ - Calculator (AST-based)           │
+│ - TodoStore (in-memory CRUD)       │
 └─────────────────────────────────────┘
+
 ```
 
 ### Design Decisions & Trade-offs
@@ -1419,6 +1506,7 @@ python -c "from src.tools import get_registry; print('✅ Setup OK')"
 ## Running the Application
 
 ### Start Server
+
 ```bash
 # Option 1: Using uvicorn directly
 uvicorn src.api.main:app --reload --port 8000
@@ -1435,6 +1523,7 @@ Server will start at: `http://localhost:8000`
 ## Example API Usage
 
 ### Health Check
+
 ```bash
 curl http://localhost:8000/health
 
@@ -1443,6 +1532,7 @@ curl http://localhost:8000/health
 ```
 
 ### Create Run: Calculator
+
 ```bash
 curl -X POST http://localhost:8000/runs \
   -H "Content-Type: application/json" \
@@ -1453,6 +1543,7 @@ curl -X POST http://localhost:8000/runs \
 ```
 
 ### Create Run: Multi-Step Todo
+
 ```bash
 curl -X POST http://localhost:8000/runs \
   -H "Content-Type: application/json" \
@@ -1463,6 +1554,7 @@ curl -X POST http://localhost:8000/runs \
 ```
 
 ### Get Run State
+
 ```bash
 curl http://localhost:8000/runs/abc-123
 
@@ -1491,6 +1583,7 @@ curl http://localhost:8000/runs/abc-123
 ## Testing Instructions
 
 ### Run All Tests
+
 ```bash
 # All tests with coverage
 pytest tests/ --cov=src --cov-report=html --cov-report=term
@@ -1509,6 +1602,7 @@ pytest tests/unit/test_calculator.py::test_calculator_basic_operations -v
 ```
 
 ### View Coverage Report
+
 ```bash
 # Generate HTML report
 pytest tests/ --cov=src --cov-report=html
@@ -1521,6 +1615,7 @@ xdg-open htmlcov/index.html
 ```
 
 ### Security Verification
+
 ```bash
 # Verify no eval/exec in calculator
 grep -r "eval\|exec" src/tools/calculator.py
@@ -1533,91 +1628,92 @@ grep -r "eval\|exec" src/tools/calculator.py
 ### Current Implementation (Tier 2)
 
 1. **Planning Limitations**
-   - Pattern-based matching limited to ~10-15 predefined patterns
-   - Cannot handle complex, novel, or ambiguous requests
-   - Multi-step parsing limited to "and", "then" separators
-   - No context awareness between steps
+    - Pattern-based matching limited to ~10-15 predefined patterns
+    - Cannot handle complex, novel, or ambiguous requests
+    - Multi-step parsing limited to "and", "then" separators
+    - No context awareness between steps
 
 2. **State Management**
-   - In-memory only: state lost on server restart
-   - No persistence layer
-   - Not scalable to multiple server instances
-   - No state cleanup (memory leak potential for long-running servers)
+    - In-memory only: state lost on server restart
+    - No persistence layer
+    - Not scalable to multiple server instances
+    - No state cleanup (memory leak potential for long-running servers)
 
 3. **Execution Orchestration**
-   - Sequential execution only (no parallel steps)
-   - Simple retry logic (exponential backoff but no jitter)
-   - No idempotency support for retry safety
-   - No cancellation mechanism for running operations
+    - Sequential execution only (no parallel steps)
+    - Simple retry logic (exponential backoff but no jitter)
+    - No idempotency support for retry safety
+    - No cancellation mechanism for running operations
 
 4. **Tool Limitations**
-   - Calculator: Limited to Tier 2 operators (no scientific functions)
-   - TodoStore: No search, filter, or priority features
-   - No tool versioning or hot-reload capability
-   - No tool execution timeout per-tool customization
+    - Calculator: Limited to Tier 2 operators (no scientific functions)
+    - TodoStore: No search, filter, or priority features
+    - No tool versioning or hot-reload capability
+    - No tool execution timeout per-tool customization
 
 5. **API Limitations**
-   - No authentication or rate limiting
-   - No pagination for large execution logs
-   - Polling required for run status (no webhooks/SSE)
-   - No run cancellation endpoint
+    - No authentication or rate limiting
+    - No pagination for large execution logs
+    - Polling required for run status (no webhooks/SSE)
+    - No run cancellation endpoint
 
 ## Potential Improvements
 
 ### If I Had More Time
 
 1. **LLM Integration** (2-3 hours)
-   - Replace pattern-based planner with LLM (e.g., Ollama, OpenAI)
-   - Structured output generation for better tool selection
-   - Natural language reasoning explanations
-   - Context awareness and multi-turn conversations
+    - Replace pattern-based planner with LLM (e.g., Ollama, OpenAI)
+    - Structured output generation for better tool selection
+    - Natural language reasoning explanations
+    - Context awareness and multi-turn conversations
 
 2. **Persistent State** (2-3 hours)
-   - SQLite or PostgreSQL for run state persistence
-   - Redis for fast state access and caching
-   - State cleanup policies and archival
-   - Database migrations for schema evolution
+    - SQLite or PostgreSQL for run state persistence
+    - Redis for fast state access and caching
+    - State cleanup policies and archival
+    - Database migrations for schema evolution
 
 3. **Advanced Orchestration** (3-4 hours)
-   - Parallel execution of independent steps
-   - DAG-based execution planning (not just sequential)
-   - Conditional branching based on step outcomes
-   - Step dependencies and data passing between steps
-   - Idempotency via step result caching
+    - Parallel execution of independent steps
+    - DAG-based execution planning (not just sequential)
+    - Conditional branching based on step outcomes
+    - Step dependencies and data passing between steps
+    - Idempotency via step result caching
 
 4. **Production Hardening** (4-5 hours)
-   - Authentication and authorization (API keys, OAuth)
-   - Rate limiting and request throttling
-   - Comprehensive logging and observability (structured logs, metrics)
-   - Health checks with dependency validation
-   - Graceful shutdown and connection draining
+    - Authentication and authorization (API keys, OAuth)
+    - Rate limiting and request throttling
+    - Comprehensive logging and observability (structured logs, metrics)
+    - Health checks with dependency validation
+    - Graceful shutdown and connection draining
 
 5. **Enhanced Testing** (2-3 hours)
-   - Property-based testing (Hypothesis)
-   - Load testing and performance benchmarks
-   - Chaos testing for retry logic validation
-   - Mutation testing for test suite quality
+    - Property-based testing (Hypothesis)
+    - Load testing and performance benchmarks
+    - Chaos testing for retry logic validation
+    - Mutation testing for test suite quality
 
 6. **Developer Experience** (1-2 hours)
-   - OpenAPI/Swagger UI for API exploration
-   - WebSocket or SSE for real-time run updates
-   - CLI tool for easier interaction
-   - Docker containerization for easy deployment
+    - OpenAPI/Swagger UI for API exploration
+    - WebSocket or SSE for real-time run updates
+    - CLI tool for easier interaction
+    - Docker containerization for easy deployment
 
 ## Test Coverage Summary
 
 **Current Coverage**: >80% (Tier 2 target met)
 
-| Module | Coverage | Status |
-|--------|----------|--------|
-| src/tools/calculator.py | >85% | ✅ |
-| src/tools/todo_store.py | >85% | ✅ |
-| src/planning/planner.py | >80% | ✅ |
-| src/orchestration/orchestrator.py | >80% | ✅ |
-| src/api/routes/ | >75% | ✅ |
-| **Overall** | **>80%** | **✅** |
+| Module                            | Coverage | Status |
+|-----------------------------------|----------|--------|
+| src/tools/calculator.py           | >85%     | ✅      |
+| src/tools/todo_store.py           | >85%     | ✅      |
+| src/planning/planner.py           | >80%     | ✅      |
+| src/orchestration/orchestrator.py | >80%     | ✅      |
+| src/api/routes/                   | >75%     | ✅      |
+| **Overall**                       | **>80%** | **✅**  |
 
 **Uncovered Areas**:
+
 - Edge cases in error recovery paths
 - Some timeout handling branches
 - Rare exception scenarios
@@ -1668,6 +1764,7 @@ crane-challenge/
 ## Author
 
 [Your Name]
+
 ```
 
 #### 7.2 Code Comments
@@ -1705,12 +1802,14 @@ echo "✅ README complete" || echo "❌ README incomplete"
 ---
 
 ### Phase 8: Verification & Submission
+
 **Duration**: 20-30 minutes
 **Priority**: CRITICAL - Final quality gate
 
 #### 8.1 Pre-Submission Checklist
 
 **Functional Verification**:
+
 ```bash
 # 1. Start server
 uvicorn src.api.main:app --port 8000 &
@@ -1738,6 +1837,7 @@ pkill -f "uvicorn src.api.main:app"
 ```
 
 **Security Verification**:
+
 ```bash
 # Verify no eval/exec in calculator
 grep -r "eval\|exec" src/tools/calculator.py && echo "🚨 SECURITY RISK" || echo "✅ Security OK"
@@ -1747,6 +1847,7 @@ pytest tests/unit/test_calculator.py::test_calculator_blocks_eval_injection -v
 ```
 
 **Test Coverage Verification**:
+
 ```bash
 # Run all tests with coverage
 pytest tests/ --cov=src --cov-report=term | tee coverage_report.txt
@@ -1761,6 +1862,7 @@ fi
 ```
 
 **Code Quality Verification**:
+
 ```bash
 # Run linter
 ruff check src/ tests/
@@ -1775,6 +1877,7 @@ find src/ -name "*.py" -exec grep -l "print(" {} \; | grep -v "__pycache__" && e
 #### 8.2 Submission Package Creation
 
 **Git Repository Checklist**:
+
 ```bash
 # 1. Verify all changes committed
 git status  # Should show "working tree clean"
@@ -1788,6 +1891,7 @@ git push origin v1.0.0
 ```
 
 **Zip Package Creation** (if not using git):
+
 ```bash
 # Create submission zip
 zip -r crane-ai-agent-submission.zip \
@@ -1807,6 +1911,7 @@ unzip -l crane-ai-agent-submission.zip | head -20
 ```
 
 **Final Documentation Check**:
+
 ```bash
 # Verify README sections
 cat README.md | grep -E "^##" | sort
@@ -1825,6 +1930,7 @@ cat README.md | grep -E "^##" | sort
 #### 8.3 Submission Email/Upload
 
 **Repository Submission** (Preferred):
+
 1. Create private GitHub repository
 2. Push all code with clean commit history
 3. Add evaluator as collaborator
@@ -1832,12 +1938,14 @@ cat README.md | grep -E "^##" | sort
 5. Send repository URL via email
 
 **Zip File Submission** (Alternative):
+
 1. Create submission zip package
 2. Upload to file sharing service (Google Drive, Dropbox, etc.)
 3. Share link with evaluator via email
 4. Ensure link has proper access permissions
 
 **Submission Email Template**:
+
 ```
 Subject: Crane AI Agent Take-Home Submission - [Your Name]
 
@@ -1870,6 +1978,7 @@ Best regards,
 ```
 
 **Exit Criteria**:
+
 1. ✅ All tests pass: `pytest tests/ -v`
 2. ✅ Coverage >80%: Verified in report
 3. ✅ Security check passes: No eval/exec, injection tests pass
@@ -1879,6 +1988,7 @@ Best regards,
 7. ✅ Clean commit history: Clear, meaningful commit messages
 
 **Quality Gate**: Final verification script
+
 ```bash
 #!/bin/bash
 # verify_submission.sh
@@ -1937,17 +2047,20 @@ fi
 #### Tier 1 Requirements (Minimum Viable - 60-70%)
 
 **Calculator**:
+
 - Basic operators: `+`, `-`, `*`, `/`
 - Integer arithmetic only
 - Simple error messages
 - Basic AST implementation (even if limited)
 
 **TodoStore**:
+
 - `add`: Create todo (returns ID)
 - `list`: Retrieve all todos
 - In-memory storage with basic dict
 
 **Tool Interface**:
+
 - name, description, input_schema defined
 - execute() method returns success/output/error
 - Basic error handling
@@ -1957,6 +2070,7 @@ fi
 #### Tier 2 Requirements (TARGET - 75-85%)
 
 **Calculator** (Enhanced):
+
 - ✅ All Tier 1 features
 - ✅ Decimal numbers: `3.14 + 2.86`
 - ✅ Negative numbers: `-5 * 3`
@@ -1966,6 +2080,7 @@ fi
 - ✅ Input validation
 
 **TodoStore** (Full CRUD):
+
 - ✅ All Tier 1 features
 - ✅ `get`: Retrieve todo by ID
 - ✅ `complete`: Mark todo as done
@@ -1974,12 +2089,14 @@ fi
 - ✅ Error handling (ID not found, etc.)
 
 **Tool Interface**:
+
 - ✅ Consistent error handling across all tools
 - ✅ Type-safe input validation
 - ✅ Comprehensive input schemas
 - ✅ Tool registry with dynamic lookup
 
 **Testing**:
+
 - ✅ >80% test coverage
 - ✅ Unit tests for all operations
 - ✅ Security tests (injection attempts blocked)
@@ -1990,6 +2107,7 @@ fi
 #### Tier 3 Requirements (Stretch - 85-95%)
 
 **Calculator** (Scientific):
+
 - ✅ All Tier 2 features
 - ✅ Scientific functions: `sqrt`, `pow`, `sin`, `cos`, `log`
 - ✅ Constants: `pi`, `e`
@@ -1997,6 +2115,7 @@ fi
 - ✅ Edge case handling (NaN, infinity, etc.)
 
 **TodoStore** (Advanced):
+
 - ✅ All Tier 2 features
 - ✅ `update`: Modify todo title
 - ✅ `filter`: Filter by completed status
@@ -2005,12 +2124,14 @@ fi
 - ✅ Sorting and pagination
 
 **Tool System**:
+
 - ✅ Tool versioning support
 - ✅ Hot-reload capability
 - ✅ Per-tool timeout configuration
 - ✅ Tool execution metrics
 
 **Testing**:
+
 - ✅ >90% test coverage
 - ✅ Property-based testing (Hypothesis)
 - ✅ Comprehensive edge cases
@@ -2023,18 +2144,21 @@ fi
 #### Tier 1 (Minimum)
 
 **Pattern Matching**:
+
 - 5-7 basic patterns
 - Calculator: "calculate X"
 - Todo: "add todo X", "list todos"
 - Single-step only
 
 **Validation**:
+
 - Basic tool existence check
 - Simple error messages
 
 #### Tier 2 (TARGET)
 
 **Pattern Matching**:
+
 - ✅ 10-15 comprehensive patterns
 - ✅ Multiple variations per operation
 - ✅ Calculator: calculate, compute, solve, what is, direct math
@@ -2042,12 +2166,14 @@ fi
 - ✅ Multi-step parsing: "X and then Y", "X then Y", "X and Y"
 
 **Validation**:
+
 - ✅ Tool existence validation
 - ✅ Input schema validation against tool requirements
 - ✅ Clear error messages for invalid prompts
 - ✅ Edge case handling (empty, ambiguous, impossible)
 
 **Plan Quality**:
+
 - ✅ Reasoning field explains each step
 - ✅ Proper step numbering and sequencing
 - ✅ Structured JSON output
@@ -2055,6 +2181,7 @@ fi
 #### Tier 3 (Stretch)
 
 **Advanced Features**:
+
 - ✅ Context awareness between steps
 - ✅ Variable passing (use output from step N in step N+1)
 - ✅ Conditional branching
@@ -2065,34 +2192,39 @@ fi
 #### Tier 1 (Minimum)
 
 **Execution**:
+
 - Sequential execution (one step at a time)
 - Basic state tracking (run status)
 - Simple error handling
 
 **State Management**:
+
 - In-memory dict
 - run_id, status, execution_log
 
 #### Tier 2 (TARGET)
 
 **Execution**:
+
 - ✅ Sequential execution with proper ordering
 - ✅ Comprehensive state tracking
 - ✅ Retry logic with exponential backoff
-  - max_attempts: 3
-  - initial_delay: 1.0s
-  - backoff_multiplier: 2.0
-  - max_delay: 10.0s
+    - max_attempts: 3
+    - initial_delay: 1.0s
+    - backoff_multiplier: 2.0
+    - max_delay: 10.0s
 - ✅ Timeout handling per step
 - ✅ Detailed execution logs
 
 **State Management**:
+
 - ✅ Complete RunState model
 - ✅ StepExecution with attempt tracking
 - ✅ Timestamps (created_at, started_at, completed_at)
 - ✅ Error tracking at run and step levels
 
 **Error Handling**:
+
 - ✅ Graceful failure handling
 - ✅ Clear error messages
 - ✅ State preserved on failure
@@ -2101,6 +2233,7 @@ fi
 #### Tier 3 (Stretch)
 
 **Advanced Features**:
+
 - ✅ Idempotency support (safe retry of failed runs)
 - ✅ Parallel execution of independent steps
 - ✅ Cancellation mechanism
@@ -2112,39 +2245,45 @@ fi
 #### Tier 1 (Minimum)
 
 **Endpoints**:
+
 - POST /runs: Create run (basic)
 - GET /runs/{run_id}: Get state (basic)
 - GET /health: Health check
 
 **Error Handling**:
+
 - Basic status codes (200, 400, 500)
 
 #### Tier 2 (TARGET)
 
 **Endpoints**:
+
 - ✅ POST /runs: Create run with validation
-  - Request: {"prompt": "..."}
-  - Response: {"run_id": "...", "status": "pending"}
-  - Status codes: 201, 400, 500
+    - Request: {"prompt": "..."}
+    - Response: {"run_id": "...", "status": "pending"}
+    - Status codes: 201, 400, 500
 - ✅ GET /runs/{run_id}: Complete run state
-  - Response includes full execution log
-  - Status codes: 200, 404
+    - Response includes full execution log
+    - Status codes: 200, 404
 - ✅ GET /health: Health check
-  - Response: {"status": "healthy", "timestamp": "..."}
-  - Status code: 200
+    - Response: {"status": "healthy", "timestamp": "..."}
+    - Status code: 200
 
 **Request/Response**:
+
 - ✅ Pydantic schemas for validation
 - ✅ Type-safe models
 - ✅ Clear error responses
 
 **Error Handling**:
+
 - ✅ Proper HTTP status codes
 - ✅ Actionable error messages
 - ✅ Standard exception → HTTPException mapping
 - ✅ Input validation errors
 
 **Integration**:
+
 - ✅ FastAPI dependency injection
 - ✅ Async/await throughout
 - ✅ OpenAPI documentation (automatic)
@@ -2152,6 +2291,7 @@ fi
 #### Tier 3 (Stretch)
 
 **Advanced Features**:
+
 - ✅ Pagination for execution logs
 - ✅ Run cancellation endpoint (DELETE /runs/{run_id})
 - ✅ WebSocket or SSE for real-time updates
@@ -2274,22 +2414,27 @@ fi
 ### 4.3 Design Patterns
 
 **Factory Pattern** (Tool Registry):
+
 ```python
 class ToolRegistry:
     """Central factory for tool instances"""
+
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 ```
 
 **Strategy Pattern** (Retry Logic):
+
 ```python
 class RetryConfig:
     """Configurable retry strategy"""
+
     def get_delay(self, attempt: int) -> float:
-        # Exponential backoff calculation
+# Exponential backoff calculation
 ```
 
 **State Pattern** (Run State Management):
+
 ```python
 class RunState:
     status: Literal["pending", "running", "completed", "failed"]
@@ -2297,14 +2442,15 @@ class RunState:
 ```
 
 **Dependency Injection** (FastAPI):
+
 ```python
 @router.post("/runs")
 async def create_run(
-    request: CreateRunRequest,
-    planner: Planner = Depends(get_planner),
-    orchestrator: Orchestrator = Depends(get_orchestrator)
+        request: CreateRunRequest,
+        planner: Planner = Depends(get_planner),
+        orchestrator: Orchestrator = Depends(get_orchestrator)
 ):
-    # Clean, testable, decoupled
+# Clean, testable, decoupled
 ```
 
 ### 4.4 Error Handling Strategy
@@ -2312,23 +2458,24 @@ async def create_run(
 **Layered Error Handling**:
 
 1. **Tool Layer**:
-   - Catch all exceptions
-   - Return ToolResult(success=False, error="message")
-   - Never raise exceptions to caller
+    - Catch all exceptions
+    - Return ToolResult(success=False, error="message")
+    - Never raise exceptions to caller
 
 2. **Orchestrator Layer**:
-   - Retry on tool failures
-   - Track errors in StepExecution
-   - Mark run as failed if step fails after retries
-   - Never crash on tool errors
+    - Retry on tool failures
+    - Track errors in StepExecution
+    - Mark run as failed if step fails after retries
+    - Never crash on tool errors
 
 3. **API Layer**:
-   - Catch ValueError → 400 Bad Request
-   - Catch KeyError → 404 Not Found
-   - Catch Exception → 500 Internal Server Error
-   - Return clear JSON error messages
+    - Catch ValueError → 400 Bad Request
+    - Catch KeyError → 404 Not Found
+    - Catch Exception → 500 Internal Server Error
+    - Return clear JSON error messages
 
 **Error Message Quality**:
+
 - ❌ Bad: "Error"
 - ❌ Bad: "Something went wrong"
 - ✅ Good: "Cannot divide by zero in expression: 5 / 0"
@@ -2338,6 +2485,7 @@ async def create_run(
 ### 4.5 State Management
 
 **In-Memory State** (Tier 2):
+
 ```python
 class Orchestrator:
     def __init__(self):
@@ -2345,15 +2493,18 @@ class Orchestrator:
 ```
 
 **Trade-offs**:
+
 - ✅ Pros: Simple, fast, no dependencies
 - ❌ Cons: Lost on restart, no persistence, not scalable
 
 **Persistent State** (Future):
+
 ```python
 # Option 1: SQLite
 class PersistentOrchestrator(Orchestrator):
     def __init__(self, db_path: str):
         self.db = sqlite3.connect(db_path)
+
 
 # Option 2: Redis
 class RedisOrchestrator(Orchestrator):
@@ -2381,6 +2532,7 @@ class RedisOrchestrator(Orchestrator):
 ```
 
 **Test Distribution**:
+
 - **Unit Tests**: 80% of tests (fast, isolated, high coverage)
 - **Integration Tests**: 15% of tests (API + orchestrator + tools)
 - **E2E Tests**: 5% of tests (full user flow)
@@ -2388,6 +2540,7 @@ class RedisOrchestrator(Orchestrator):
 ### 5.2 Unit Test Coverage by Module
 
 **Calculator Tool** (`tests/unit/test_calculator.py`):
+
 - ✅ Basic operations (+, -, *, /)
 - ✅ Decimal numbers
 - ✅ Negative numbers
@@ -2400,6 +2553,7 @@ class RedisOrchestrator(Orchestrator):
 - ✅ Security: __import__ blocked (MANDATORY)
 
 **TodoStore Tool** (`tests/unit/test_todo_store.py`):
+
 - ✅ Add todo
 - ✅ List todos (empty, with items)
 - ✅ Get todo by ID
@@ -2410,6 +2564,7 @@ class RedisOrchestrator(Orchestrator):
 - ✅ State isolation between operations
 
 **Planner** (`tests/unit/test_planner.py`):
+
 - ✅ Single-step calculator pattern
 - ✅ Single-step todo patterns (add, list)
 - ✅ Multi-step parsing ("and then")
@@ -2418,6 +2573,7 @@ class RedisOrchestrator(Orchestrator):
 - ✅ Empty prompt error
 
 **Orchestrator** (`tests/unit/test_orchestrator.py`):
+
 - ✅ Sequential execution
 - ✅ State tracking (pending → running → completed)
 - ✅ Retry on failure (with mock)
@@ -2428,12 +2584,14 @@ class RedisOrchestrator(Orchestrator):
 ### 5.3 Integration Test Coverage
 
 **Full Flow Test** (`tests/integration/test_full_flow.py`):
+
 - ✅ Calculator flow: Create run → Execute → Retrieve result
 - ✅ Todo flow: Multi-step (add + list) → Retrieve results
 - ✅ Error handling: Invalid prompt → 400 response
 - ✅ Error handling: Invalid run_id → 404 response
 
 **API Integration** (`tests/integration/test_api.py`):
+
 - ✅ POST /runs with valid prompt
 - ✅ POST /runs with invalid prompt
 - ✅ GET /runs/{run_id} for completed run
@@ -2443,6 +2601,7 @@ class RedisOrchestrator(Orchestrator):
 ### 5.4 Security Test Coverage
 
 **Calculator Security** (MANDATORY):
+
 ```python
 @pytest.mark.parametrize("injection", [
     "__import__('os').system('echo hacked')",
@@ -2464,18 +2623,20 @@ async def test_calculator_blocks_injection(injection):
 
 **By Tier**:
 
-| Tier | Overall | Tools | Planning | Orchestration | API |
-|------|---------|-------|----------|---------------|-----|
+| Tier | Overall | Tools | Planning | Orchestration | API  |
+|------|---------|-------|----------|---------------|------|
 | 1    | >70%    | >70%  | >60%     | >60%          | >50% |
 | 2    | >80%    | >85%  | >80%     | >80%          | >75% |
 | 3    | >90%    | >95%  | >90%     | >90%          | >85% |
 
 **Priority Coverage Areas** (Must be >90%):
+
 1. Calculator evaluation logic (security critical)
 2. Retry logic (correctness critical)
 3. Error handling paths (robustness critical)
 
 **Acceptable Lower Coverage** (<80%):
+
 1. API boilerplate (FastAPI handles much)
 2. Logging and debugging code
 3. Rare exception scenarios
@@ -2487,6 +2648,7 @@ async def test_calculator_blocks_injection(injection):
 ### 6.1 Phase Checkpoints
 
 **After Phase 3 (~3-3.5 hours)**:
+
 ```
 Status Check:
 - Tools implemented and tested? ✅
@@ -2500,6 +2662,7 @@ Decision:
 ```
 
 **After Phase 5 (~5-6 hours)**:
+
 ```
 Status Check:
 - Orchestrator executing plans? ✅
@@ -2514,6 +2677,7 @@ Decision:
 ```
 
 **After Phase 6 (~6-7 hours)**:
+
 ```
 Status Check:
 - All tests passing? ✅
@@ -2529,6 +2693,7 @@ Decision:
 ```
 
 **After Phase 7 (~6.5-7.5 hours)**:
+
 ```
 Status Check:
 - README complete? ✅
@@ -2541,6 +2706,7 @@ Decision:
 ```
 
 **After Phase 8 (~7-8 hours)**:
+
 ```
 Final Check:
 - All tests pass? ✅
@@ -2556,41 +2722,48 @@ Action:
 ### 6.2 Red Flags by Phase
 
 **Phase 1 Red Flags**:
-- >150 minutes elapsed
+
+- > 150 minutes elapsed
 - Calculator still using eval/exec
 - Tests not written alongside code
 - **Action**: Cut Tier 3 features immediately
 
 **Phase 3 Red Flags**:
-- >50 minutes on planner
+
+- > 50 minutes on planner
 - Trying to handle too many edge cases
 - Overthinking pattern complexity
 - **Action**: Lock current patterns, move on
 
 **Phase 4 Red Flags**:
-- >100 minutes on orchestrator
+
+- > 100 minutes on orchestrator
 - Implementing idempotency (Tier 3 feature)
 - Complex state management
 - **Action**: Skip idempotency, simplify state
 
 **Phase 6 Red Flags**:
+
 - Coverage <75%
 - Multiple test failures
 - Integration tests not passing
 - **Action**: Emergency 30m fix window, then accept
 
 **Phase 7 Red Flags**:
-- >60 minutes on documentation
+
+- > 60 minutes on documentation
 - Trying to write perfect docs
 - **Action**: Finalize current content, move to Phase 8
 
 **Overall Red Flags**:
-- >8 hours total time
+
+- > 8 hours total time
 - **Action**: SHIP NOW with what you have
 
 ### 6.3 Emergency Triage Procedures
 
 **Scenario: <4 hours remaining, Phase 1 incomplete**
+
 ```
 Triage Plan:
 1. STOP Tier 3 features
@@ -2601,6 +2774,7 @@ Triage Plan:
 ```
 
 **Scenario: <2 hours remaining, API not working**
+
 ```
 Emergency Plan:
 1. STOP all new development
@@ -2612,6 +2786,7 @@ Emergency Plan:
 ```
 
 **Scenario: <1 hour remaining**
+
 ```
 SHIP NOW:
 1. Server starts? ✅ → Ship
@@ -2629,6 +2804,7 @@ SHIP NOW:
 ### 7.1 Must-Have Features (ALL Tiers)
 
 **Critical Path** (Cannot submit without):
+
 1. **Security**: AST-based calculator (no eval/exec)
 2. **Functionality**: POST /runs works with calculator AND todo
 3. **Testing**: Tests exist and >75% pass
@@ -2636,6 +2812,7 @@ SHIP NOW:
 5. **Submission**: Package created and verified
 
 **Verification**:
+
 ```bash
 # Quick verification
 ./verify_submission.sh | grep "READY TO SUBMIT"
@@ -2644,6 +2821,7 @@ SHIP NOW:
 ### 7.2 Tier 1 Features (60-70%)
 
 **Minimum Viable Product**:
+
 - Calculator: +, -, *, / (integers)
 - TodoStore: add, list
 - Planner: 5 basic patterns, single-step
@@ -2658,6 +2836,7 @@ SHIP NOW:
 ### 7.3 Tier 2 Features (75-85%) - TARGET
 
 **Target Achievement**:
+
 - ✅ All Tier 1 features
 - ✅ Calculator: decimals, negatives, parentheses
 - ✅ TodoStore: full CRUD (add, list, get, complete, delete)
@@ -2671,6 +2850,7 @@ SHIP NOW:
 **Priority**: PRIMARY TARGET
 
 **Differentiators from Tier 1**:
+
 - Coverage: >80% vs >70%
 - Retry: Exponential backoff vs none
 - Multi-step: "and then" parsing vs single-step
@@ -2680,6 +2860,7 @@ SHIP NOW:
 ### 7.4 Tier 3 Features (85-95%) - STRETCH
 
 **Advanced Features** (Only if ahead of schedule):
+
 - Calculator: sqrt, pow, sin, cos, log
 - TodoStore: update, filter, search, priority
 - Orchestrator: Idempotency support
@@ -2693,15 +2874,15 @@ SHIP NOW:
 
 ### 7.5 Feature Prioritization Matrix
 
-| Feature | Tier 1 | Tier 2 | Tier 3 | Complexity | Skip If Behind? |
-|---------|--------|--------|--------|------------|-----------------|
-| AST Calculator | ✅ Basic | ✅ Enhanced | ✅ Scientific | High | ❌ Never |
-| TodoStore CRUD | ✅ Add/List | ✅ Full CRUD | ✅ Advanced | Medium | ⚠️ Tier 3 only |
-| Planner Patterns | ✅ 5 patterns | ✅ 15 patterns | ✅ Context-aware | Medium | ⚠️ Lock at 10 |
-| Retry Logic | ❌ None | ✅ Exponential | ✅ + Idempotency | High | ⚠️ Tier 3 only |
-| Test Coverage | 70% | 80% | 90% | High | ⚠️ Accept 75% |
-| Documentation | Basic | Comprehensive | Perfect | Low | ✅ Can compress |
-| Security Tests | ✅ Basic | ✅ Comprehensive | ✅ Exhaustive | Medium | ❌ Never |
+| Feature          | Tier 1       | Tier 2          | Tier 3          | Complexity | Skip If Behind? |
+|------------------|--------------|-----------------|-----------------|------------|-----------------|
+| AST Calculator   | ✅ Basic      | ✅ Enhanced      | ✅ Scientific    | High       | ❌ Never         |
+| TodoStore CRUD   | ✅ Add/List   | ✅ Full CRUD     | ✅ Advanced      | Medium     | ⚠️ Tier 3 only  |
+| Planner Patterns | ✅ 5 patterns | ✅ 15 patterns   | ✅ Context-aware | Medium     | ⚠️ Lock at 10   |
+| Retry Logic      | ❌ None       | ✅ Exponential   | ✅ + Idempotency | High       | ⚠️ Tier 3 only  |
+| Test Coverage    | 70%          | 80%             | 90%             | High       | ⚠️ Accept 75%   |
+| Documentation    | Basic        | Comprehensive   | Perfect         | Low        | ✅ Can compress  |
+| Security Tests   | ✅ Basic      | ✅ Comprehensive | ✅ Exhaustive    | Medium     | ❌ Never         |
 
 ---
 
@@ -2710,82 +2891,91 @@ SHIP NOW:
 ### 8.1 Technical Risks
 
 **Risk 1: AST Calculator Complexity**
+
 - **Probability**: Medium (40%)
 - **Impact**: Critical (blocks submission)
 - **Symptoms**: >90 minutes on Phase 1, eval/exec still present, tests failing
 - **Mitigation**:
-  - Start with simple NodeVisitor pattern
-  - Use standard library ast module examples
-  - Limit to basic operators initially (Tier 1)
-  - Add Tier 2 operators incrementally
+    - Start with simple NodeVisitor pattern
+    - Use standard library ast module examples
+    - Limit to basic operators initially (Tier 1)
+    - Add Tier 2 operators incrementally
 - **Fallback**: If >120m, freeze Tier 1 features, move on
 - **Detection**: `grep -r "eval\|exec" src/tools/calculator.py`
 
 **Risk 2: Test Coverage Gaps**
+
 - **Probability**: High (60%)
 - **Impact**: High (tier reduction)
 - **Symptoms**: <80% coverage at Phase 6 checkpoint
 - **Mitigation**:
-  - Write tests alongside code (not at end)
-  - Focus on critical paths first
-  - Use pytest-cov to track coverage continuously
-  - Prioritize error path testing
+    - Write tests alongside code (not at end)
+    - Focus on critical paths first
+    - Use pytest-cov to track coverage continuously
+    - Prioritize error path testing
 - **Fallback**: Accept 75-80% coverage, document gaps in README
 - **Detection**: `pytest --cov=src --cov-report=term | grep TOTAL`
 
 **Risk 3: Orchestrator Complexity**
+
 - **Probability**: Medium (40%)
 - **Impact**: High (Tier 2 feature loss)
 - **Symptoms**: >100m on Phase 4, retry logic buggy
 - **Mitigation**:
-  - Keep state management simple (in-memory dict)
-  - Use asyncio.sleep() for delays (not complex queue)
-  - Test retry with mocked failures
-  - Skip idempotency if behind
+    - Keep state management simple (in-memory dict)
+    - Use asyncio.sleep() for delays (not complex queue)
+    - Test retry with mocked failures
+    - Skip idempotency if behind
 - **Fallback**: Basic sequential execution without retry
 - **Detection**: Phase 4 timer >75m
 
 **Risk 4: Pattern Planner Limitations**
+
 - **Probability**: Low (20%)
 - **Impact**: Medium (may not handle all prompts)
 - **Symptoms**: Test prompts not matching patterns
 - **Mitigation**:
-  - Start with assignment example prompts
-  - Add patterns incrementally
-  - Document limitations clearly
-  - Test with example prompts first
+    - Start with assignment example prompts
+    - Add patterns incrementally
+    - Document limitations clearly
+    - Test with example prompts first
 - **Fallback**: Document unsupported patterns in README
 - **Detection**: Integration tests failing on prompt parsing
 
 **Risk 5: Time Overrun**
+
 - **Probability**: High (70%)
 - **Impact**: Variable (depends on phase)
 - **Symptoms**: Checkpoints exceeded (see Phase Red Flags)
 - **Mitigation**:
-  - Track time per phase religiously
-  - Cut features proactively at red flags
-  - Use emergency triage procedures
-  - Accept lower tier completion over perfection
+    - Track time per phase religiously
+    - Cut features proactively at red flags
+    - Use emergency triage procedures
+    - Accept lower tier completion over perfection
 - **Fallback**: Emergency procedures (<4h, <2h, <1h)
 - **Detection**: Phase timer comparisons
 
 ### 8.2 Quality Risks
 
 **Risk 1: Error Handling Gaps**
+
 - **Mitigation**: Test error paths explicitly, use pytest.raises
 - **Fallback**: Document known error cases in README
 
 **Risk 2: Security Vulnerabilities**
+
 - **Mitigation**: Mandatory security tests, AST-only calculator
 - **Fallback**: NONE - security is non-negotiable
 
 **Risk 3: Documentation Rushed**
+
 - **Mitigation**: Template-based approach, honest limitations
 - **Fallback**: Basic README better than perfect README
 
 ### 8.3 Risk Monitoring
 
 **Continuous Monitoring**:
+
 ```bash
 # Time tracking
 ./track_time.sh summary  # Check against phase estimates
@@ -2801,6 +2991,7 @@ pytest tests/ -q --tb=no | tail -1
 ```
 
 **Decision Points**:
+
 - After Phase 3 (~3.5h): Tier 3 features decision
 - After Phase 5 (~6h): Coverage backfill decision
 - After Phase 6 (~7h): Ship vs fix decision
@@ -2813,6 +3004,7 @@ pytest tests/ -q --tb=no | tail -1
 ### 9.1 Functional Success
 
 **Core Functionality** (Pass/Fail):
+
 - [ ] Server starts without errors
 - [ ] GET /health returns 200
 - [ ] POST /runs creates run with calculator prompt
@@ -2822,6 +3014,7 @@ pytest tests/ -q --tb=no | tail -1
 - [ ] Todo flow: add → list returns added item
 
 **Verification Command**:
+
 ```bash
 ./verify_submission.sh | grep "✅"
 ```
@@ -2829,6 +3022,7 @@ pytest tests/ -q --tb=no | tail -1
 ### 9.2 Quality Metrics
 
 **Test Coverage** (Tier 2 Target):
+
 - Overall: >80%
 - Tools: >85%
 - Planning: >80%
@@ -2836,11 +3030,13 @@ pytest tests/ -q --tb=no | tail -1
 - API: >75%
 
 **Test Pass Rate**:
+
 - Unit tests: 100%
 - Integration tests: 100%
 - Security tests: 100%
 
 **Verification Command**:
+
 ```bash
 pytest tests/ --cov=src --cov-report=term
 pytest tests/ -v
@@ -2849,6 +3045,7 @@ pytest tests/ -v
 ### 9.3 Security Metrics
 
 **Security Verification** (Pass/Fail - CRITICAL):
+
 - [ ] No `eval()` in calculator.py
 - [ ] No `exec()` in calculator.py
 - [ ] Injection test: `__import__('os')` blocked
@@ -2856,6 +3053,7 @@ pytest tests/ -v
 - [ ] Injection test: `eval('2+2')` blocked
 
 **Verification Command**:
+
 ```bash
 grep -r "eval\|exec" src/tools/calculator.py && echo "🚨 SECURITY FAILURE" || echo "✅ Security OK"
 pytest tests/unit/test_calculator.py::test_calculator_blocks_eval_injection -v
@@ -2864,6 +3062,7 @@ pytest tests/unit/test_calculator.py::test_calculator_blocks_eval_injection -v
 ### 9.4 Documentation Metrics
 
 **README Completeness** (Checklist):
+
 - [ ] System architecture section
 - [ ] Setup instructions tested
 - [ ] Example curl commands work
@@ -2874,6 +3073,7 @@ pytest tests/unit/test_calculator.py::test_calculator_blocks_eval_injection -v
 - [ ] Potential improvements realistic
 
 **Verification Command**:
+
 ```bash
 grep -c "^##" README.md  # Should be >8 sections
 ```
@@ -2881,26 +3081,30 @@ grep -c "^##" README.md  # Should be >8 sections
 ### 9.5 Tier Achievement
 
 **Tier 1 (60-70%)**:
+
 - Basic features working
 - Some tests passing
 - Minimal documentation
 - **Verdict**: Submitted but incomplete
 
 **Tier 2 (75-85%)** - TARGET:
+
 - All core features working
-- >80% test coverage
+- > 80% test coverage
 - Comprehensive error handling
 - Trade-offs documented
 - **Verdict**: Strong engineering fundamentals
 
 **Tier 3 (85-95%)**:
+
 - Advanced features implemented
-- >90% test coverage
+- > 90% test coverage
 - Idempotency support
 - Comprehensive documentation
 - **Verdict**: Production-grade implementation
 
 **Final Tier Assessment**:
+
 ```bash
 # Automated tier prediction
 python << 'EOF'
@@ -2961,6 +3165,7 @@ EOF
 ### 10.1 Source Code
 
 **Required Structure**:
+
 ```
 crane-challenge/
 ├── src/
@@ -3003,6 +3208,7 @@ crane-challenge/
 ```
 
 **Code Quality Standards**:
+
 - [ ] Type hints on all functions
 - [ ] Docstrings on all public functions
 - [ ] No debug print() statements
@@ -3014,6 +3220,7 @@ crane-challenge/
 ### 10.2 Tests
 
 **Test Files Required**:
+
 - [ ] `tests/unit/test_calculator.py` (10+ tests)
 - [ ] `tests/unit/test_todo_store.py` (8+ tests)
 - [ ] `tests/unit/test_planner.py` (5+ tests)
@@ -3022,6 +3229,7 @@ crane-challenge/
 - [ ] `tests/conftest.py` (fixtures)
 
 **Test Execution**:
+
 ```bash
 # All tests must pass
 pytest tests/ -v
@@ -3033,6 +3241,7 @@ pytest tests/ --cov=src --cov-report=html
 ### 10.3 Documentation
 
 **README.md Sections** (Required):
+
 - [x] System Architecture (diagram + explanation)
 - [x] Setup Instructions (step-by-step, tested)
 - [x] Running the Application (commands that work)
@@ -3046,6 +3255,7 @@ pytest tests/ --cov=src --cov-report=html
 - [x] Project Structure (directory layout)
 
 **Documentation Quality**:
+
 - [ ] No broken commands (all examples tested)
 - [ ] No placeholder text ("TODO", "FIXME")
 - [ ] Clear, concise writing
@@ -3057,6 +3267,7 @@ pytest tests/ --cov=src --cov-report=html
 **Format Options**:
 
 **Option 1: Git Repository** (Preferred):
+
 ```bash
 # Clean repository
 git status  # Should be clean
@@ -3073,6 +3284,7 @@ git push origin v1.0.0
 ```
 
 **Option 2: Zip File**:
+
 ```bash
 # Create submission package
 zip -r crane-ai-agent-submission.zip \
@@ -3092,6 +3304,7 @@ unzip -l crane-ai-agent-submission.zip
 ```
 
 **Excluded from Submission**:
+
 - `.venv/` (virtual environment)
 - `__pycache__/` (Python cache)
 - `.pytest_cache/` (test cache)
@@ -3103,6 +3316,7 @@ unzip -l crane-ai-agent-submission.zip
 ### 10.5 Final Verification Checklist
 
 **Pre-Submission Checks**:
+
 ```bash
 # 1. Clean environment test
 rm -rf .venv __pycache__ .pytest_cache htmlcov
@@ -3133,6 +3347,7 @@ git status | grep "working tree clean" && echo "PASS" || echo "WARN"
 ```
 
 **Submission Checklist**:
+
 - [ ] All tests pass (100% pass rate)
 - [ ] Coverage >80% (Tier 2 target)
 - [ ] Security verified (no eval/exec)
@@ -3147,6 +3362,7 @@ git status | grep "working tree clean" && echo "PASS" || echo "WARN"
 ## Appendix A: Time Tracking
 
 **Phase Timer Script** (`track_time.sh`):
+
 ```bash
 #!/bin/bash
 # Track time per phase
@@ -3178,6 +3394,7 @@ esac
 ```
 
 **Usage**:
+
 ```bash
 ./track_time.sh start 1    # Start Phase 1
 # ... work on phase ...
@@ -3194,12 +3411,13 @@ esac
 **Trigger**: Any phase >125% of estimated time
 
 **Procedure**:
+
 1. STOP current work
 2. Assess completeness: 80% done? 50% done? 20% done?
 3. Decision:
-   - If >80%: Finish current phase (max +15m)
-   - If 50-80%: Simplify to minimum viable
-   - If <50%: Cut feature, move to next phase
+    - If >80%: Finish current phase (max +15m)
+    - If 50-80%: Simplify to minimum viable
+    - If <50%: Cut feature, move to next phase
 4. Update tier target if needed
 5. Continue with adjusted scope
 
@@ -3208,16 +3426,17 @@ esac
 **Trigger**: Coverage report shows <80% at Phase 6 checkpoint
 
 **Procedure**:
+
 1. Run: `pytest --cov=src --cov-report=term-missing`
 2. Identify uncovered lines (prioritize critical paths)
 3. Allocate 30 minutes for backfill:
-   - 0-15m: Cover critical paths (calculator eval, retry logic)
-   - 15-25m: Cover common error paths
-   - 25-30m: Re-check coverage
+    - 0-15m: Cover critical paths (calculator eval, retry logic)
+    - 15-25m: Cover common error paths
+    - 25-30m: Re-check coverage
 4. If still <80%:
-   - Accept current coverage
-   - Document gaps in README Known Limitations
-   - Proceed to Phase 7
+    - Accept current coverage
+    - Document gaps in README Known Limitations
+    - Proceed to Phase 7
 5. If >75%: Acceptable for Tier 1.5-2
 
 ### Emergency Procedure 3: Tests Failing at Phase 6
@@ -3225,17 +3444,18 @@ esac
 **Trigger**: Multiple test failures at integration test phase
 
 **Procedure**:
+
 1. Categorize failures:
-   - Critical (calculator, todo CRUD, API): FIX IMMEDIATELY
-   - Important (error handling, edge cases): FIX IF TIME
-   - Nice-to-have (advanced features): SKIP
+    - Critical (calculator, todo CRUD, API): FIX IMMEDIATELY
+    - Important (error handling, edge cases): FIX IF TIME
+    - Nice-to-have (advanced features): SKIP
 2. Allocate 30 minutes for fixes:
-   - 0-20m: Fix critical failures
-   - 20-30m: Fix important failures if critical done
+    - 0-20m: Fix critical failures
+    - 20-30m: Fix important failures if critical done
 3. If still failing:
-   - Mark failing tests with `@pytest.mark.skip(reason="...")`
-   - Document in README Known Limitations
-   - Proceed to Phase 7 if >75% tests pass
+    - Mark failing tests with `@pytest.mark.skip(reason="...")`
+    - Document in README Known Limitations
+    - Proceed to Phase 7 if >75% tests pass
 4. If <75% pass: EMERGENCY MODE (see below)
 
 ### Emergency Procedure 4: <2 Hours Remaining
@@ -3243,13 +3463,14 @@ esac
 **Trigger**: <2 hours to deadline, significant work remaining
 
 **EMERGENCY TRIAGE**:
+
 1. STOP ALL NEW FEATURES
 2. Assess current state:
-   - Server starts? If NO → 30m emergency fix
-   - One example works? If NO → 45m get calculator working
-   - Tests exist? If NO → 30m write critical tests
+    - Server starts? If NO → 30m emergency fix
+    - One example works? If NO → 45m get calculator working
+    - Tests exist? If NO → 30m write critical tests
 3. Minimal documentation:
-   - 15m: Basic README (setup + one example)
+    - 15m: Basic README (setup + one example)
 4. SUBMIT at 1:30 remaining
 
 ### Emergency Procedure 5: <1 Hour Remaining
@@ -3257,14 +3478,15 @@ esac
 **TRIGGER**: <1 hour to deadline
 
 **SHIP NOW PROTOCOL**:
+
 1. STOP ALL WORK
 2. Quick verification:
-   - Server starts: YES → Ship | NO → 15m fix attempt
-   - One curl command works: YES → Ship | NO → Not shippable
+    - Server starts: YES → Ship | NO → 15m fix attempt
+    - One curl command works: YES → Ship | NO → Not shippable
 3. 5-minute README:
-   - Copy .env.example → README
-   - Add: "Run: uvicorn src.api.main:app"
-   - Add: "Test: curl http://localhost:8000/health"
+    - Copy .env.example → README
+    - Add: "Run: uvicorn src.api.main:app"
+    - Add: "Test: curl http://localhost:8000/health"
 4. Create submission package (5m)
 5. SUBMIT IMMEDIATELY
 
@@ -3275,6 +3497,7 @@ esac
 ## Appendix C: Example Prompts for Testing
 
 **Calculator Prompts**:
+
 ```
 "calculate 2 + 2"
 "what is (10 + 5) * 2"
@@ -3284,6 +3507,7 @@ esac
 ```
 
 **Todo Prompts**:
+
 ```
 "add a todo to buy milk"
 "add todo finish assignment"
@@ -3292,6 +3516,7 @@ esac
 ```
 
 **Multi-Step Prompts**:
+
 ```
 "add a todo to buy milk and then show me all my tasks"
 "create a task to study then list todos"
@@ -3299,6 +3524,7 @@ esac
 ```
 
 **Error Cases**:
+
 ```
 "do something impossible"
 "calculate xyz + abc"
@@ -3319,6 +3545,7 @@ esac
 **Document Purpose**: Comprehensive implementation guide for AI Agent Runtime POC
 
 **References**:
+
 - `take-home-requirements.md`: Official assignment requirements
 - `QUICK_REFERENCE_CHECKLIST.md`: One-page implementation checklist
 - `CLAUDE.md`: Project-specific development guidelines
