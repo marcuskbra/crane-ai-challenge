@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from challenge import __version__
-from challenge.api.routes import health, runs
+from challenge.api.routes import health, metrics, runs
 from challenge.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
@@ -170,12 +170,12 @@ def _register_error_handlers(app: FastAPI, settings: Settings) -> None:
     """
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
         """Handle FastAPI request validation errors."""
         logger.warning("Validation error: %s", exc.errors())
 
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={
                 "error": "validation_error",
                 "message": "Request validation failed",
@@ -184,12 +184,12 @@ def _register_error_handlers(app: FastAPI, settings: Settings) -> None:
         )
 
     @app.exception_handler(ValidationError)
-    async def pydantic_validation_handler(request: Request, exc: ValidationError) -> JSONResponse:
+    async def pydantic_validation_handler(_: Request, exc: ValidationError) -> JSONResponse:
         """Handle Pydantic validation errors."""
         logger.warning("Pydantic validation error: %s", exc.errors())
 
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={
                 "error": "validation_error",
                 "message": "Data validation failed",
@@ -198,7 +198,7 @@ def _register_error_handlers(app: FastAPI, settings: Settings) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
         """Handle unexpected exceptions."""
         logger.exception("Unhandled exception: %s", str(exc))
 
@@ -229,6 +229,7 @@ def _register_routes(app: FastAPI) -> None:
     # Include API routers
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
     app.include_router(runs.router, prefix="/api/v1", tags=["runs"])
+    app.include_router(metrics.router, prefix="/api/v1", tags=["metrics"])
 
 
 # Create default application instance for uvicorn

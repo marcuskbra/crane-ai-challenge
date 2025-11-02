@@ -24,11 +24,19 @@ class Orchestrator:
 
     The orchestrator coordinates:
     - Planning: Converting prompts to structured plans
-    - Execution: Running plan steps sequentially
+    - Execution: Running plan steps sequentially with timeout protection
     - Retry: Automatic retry with exponential backoff
     - State: Tracking run status and execution history
 
     Retry strategy: Exponential backoff (1s, 2s, 4s)
+    Timeout: Configurable per-step timeout (default: 30s)
+
+    Example:
+        >>> orchestrator = Orchestrator(step_timeout=60.0)
+        >>> run = await orchestrator.create_run("calculate 2 + 3")
+        >>> # Wait for async execution
+        >>> assert run.status == RunStatus.COMPLETED
+        >>> assert run.result == 5.0
 
     """
 
@@ -37,6 +45,7 @@ class Orchestrator:
         planner: Planner | None = None,
         tools: dict | None = None,
         max_retries: int = 3,
+        step_timeout: float = 30.0,
     ):
         """
         Initialize orchestrator.
@@ -46,11 +55,13 @@ class Orchestrator:
                      Creates PatternBasedPlanner if None.
             tools: Tool registry dict (uses default if None)
             max_retries: Maximum retry attempts per step
+            step_timeout: Timeout in seconds for each step execution (default: 30.0)
 
         """
         self.planner = planner or PatternBasedPlanner()
         self.tools = tools if tools is not None else get_tool_registry()
         self.max_retries = max_retries
+        self.step_timeout = step_timeout
         self.runs: dict[str, Run] = {}
         self.tasks: dict[str, asyncio.Task] = {}  # Track background tasks
 
@@ -132,13 +143,26 @@ class Orchestrator:
             run.started_at = datetime.now(timezone.utc)
             logger.info(f"Starting execution for run {run_id}")
 
-            # Execute each step
+            # Execute each step with timeout
             for step in run.plan.steps:
-                step_result = await self._execute_step_with_retry(step)
+                try:
+                    step_result = await asyncio.wait_for(self._execute_step_with_retry(step), timeout=self.step_timeout)
+                except asyncio.TimeoutError:
+                    # Step timed out
+                    step_result = ExecutionStep(
+                        step_number=step.step_number,
+                        tool_name=step.tool_name,
+                        tool_input=step.tool_input,
+                        success=False,
+                        error=f"Step timed out after {self.step_timeout}s",
+                        attempts=1,
+                    )
+                    logger.error(f"Run {run_id} step {step.step_number} timed out after {self.step_timeout}s")
+
                 run.execution_log.append(step_result)
 
                 if not step_result.success:
-                    # Step failed after retries
+                    # Step failed after retries or timeout
                     run.status = RunStatus.FAILED
                     run.error = f"Step {step.step_number} failed: {step_result.error}"
                     logger.error(f"Run {run_id} failed at step {step.step_number}: {step_result.error}")

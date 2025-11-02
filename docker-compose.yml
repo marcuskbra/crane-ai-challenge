@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # ==============================================================================
+  # Crane AI Agent API Service
+  # ==============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: crane-ai-agent:latest
+    container_name: crane-api
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      # Application
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      HOST: 0.0.0.0
+      PORT: 8000
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # LLM Configuration (optional)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TEMPERATURE: ${OPENAI_TEMPERATURE:-0.0}
+
+      # Orchestrator
+      MAX_RETRIES: ${MAX_RETRIES:-3}
+      STEP_TIMEOUT: ${STEP_TIMEOUT:-30.0}
+
+      # CORS (optional)
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    networks:
+      - crane-network
+
+  # ==============================================================================
+  # Development Service (with hot-reload)
+  # ==============================================================================
+  api-dev:
+    profiles:
+      - dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: crane-ai-agent:dev
+    container_name: crane-api-dev
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: development
+      HOST: 0.0.0.0
+      PORT: 8000
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      MAX_RETRIES: 3
+      STEP_TIMEOUT: 30.0
+
+    volumes:
+      # Mount source code for hot-reload
+      - ./src:/app/src:ro
+      - ./.env:/app/.env:ro
+
+    command: ["uvicorn", "challenge.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+    networks:
+      - crane-network
+
+  # ==============================================================================
+  # Future Services (commented out for reference)
+  # ==============================================================================
+
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: crane-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+  #   networks:
+  #     - crane-network
+
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: crane-postgres
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     POSTGRES_DB: crane_agent
+  #     POSTGRES_USER: crane
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U crane"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+  #   networks:
+  #     - crane-network
+
+networks:
+  crane-network:
+    driver: bridge
+
+# volumes:
+#   redis-data:
+#   postgres-data:

@@ -43,8 +43,9 @@ This agent runtime uses a **4-layer architecture** with clear separation of conc
 ┌─────────────────────────────────────────────────────────────────┐
 │                   ⚙️  ORCHESTRATION LAYER                       │
 │  Sequential Executor with State Management                      │
-│  • Step-by-step execution                                       │
+│  • Step-by-step execution with timeout protection              │
 │  • Exponential backoff retry (3 attempts)                       │
+│  • Configurable per-step timeout (default: 30s)                │
 │  • Complete execution history                                   │
 │  • Error tracking and recovery                                  │
 └────────────────────────────┬────────────────────────────────────┘
@@ -115,6 +116,109 @@ make run
 # Server starts at http://localhost:8000
 # API Documentation: http://localhost:8000/api/docs
 ```
+
+### Configuration
+
+The application can be configured using environment variables or by creating a `.env` file:
+
+```bash
+# Copy the example configuration
+cp .env.example .env
+
+# Edit .env with your settings
+```
+
+**Key Configuration Options:**
+
+```bash
+# LLM Configuration (optional - uses pattern-based fallback if not set)
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TEMPERATURE=0.0
+
+# Application Settings
+ENVIRONMENT=development
+HOST=0.0.0.0
+PORT=8000
+DEBUG=true
+LOG_LEVEL=INFO
+
+# Orchestrator Configuration
+MAX_RETRIES=3           # Retry attempts for failed steps
+STEP_TIMEOUT=30.0       # Timeout in seconds for each step execution
+```
+
+**Timeout Configuration:**
+
+The `STEP_TIMEOUT` setting controls how long the orchestrator waits for each step to complete before timing out. This prevents steps from hanging indefinitely:
+
+- **Default**: 30 seconds (suitable for most operations)
+- **Recommendation**: Increase for long-running operations (e.g., `60.0`)
+- **Behavior**: On timeout, the step is marked as failed with a clear error message
+
+Example for custom timeout:
+
+```python
+from challenge.orchestrator import Orchestrator
+
+# Custom timeout configuration
+orchestrator = Orchestrator(
+    step_timeout=60.0  # 60 second timeout for long-running operations
+)
+```
+
+### Docker Deployment
+
+The application includes production-ready Docker support with multi-stage builds for optimal image size.
+
+**Quick Start with Docker:**
+
+```bash
+# Build and run with docker-compose (production mode)
+docker-compose up -d
+
+# Or build manually
+docker build -t crane-ai-agent:latest .
+docker run -p 8000:8000 \
+  -e OPENAI_API_KEY=your-key-here \
+  -e STEP_TIMEOUT=30.0 \
+  crane-ai-agent:latest
+
+# Check health
+curl http://localhost:8000/api/v1/health
+```
+
+**Development Mode with Hot Reload:**
+
+```bash
+# Run development service with volume mounting
+docker-compose --profile dev up
+
+# This enables:
+# - Code hot-reload on file changes
+# - Debug logging
+# - Source code mounted from host
+```
+
+**Docker Configuration:**
+
+The Dockerfile uses multi-stage builds for:
+- **Smaller Images**: Builder stage separate from runtime (~200MB final image)
+- **Security**: Non-root user execution
+- **Performance**: UV package manager for fast builds
+- **Health Checks**: Built-in liveness probes
+
+**Environment Variables:**
+
+All configuration options from `.env.example` are supported as environment variables in Docker.
+
+**Resource Limits:**
+
+Default limits in docker-compose.yml:
+- CPU: 1.0 core (0.5 reserved)
+- Memory: 512MB (256MB reserved)
+
+Adjust in `docker-compose.yml` based on workload.
 
 ---
 
@@ -337,6 +441,51 @@ curl http://localhost:8000/api/v1/runs/nonexistent-id
 
 ---
 
+### 5. System Metrics (Observability)
+
+**Request:**
+
+```bash
+curl http://localhost:8000/api/v1/metrics
+```
+
+**Response:**
+
+```json
+{
+  "timestamp": "2025-01-29T15:30:00.000Z",
+  "runs": {
+    "total": 150,
+    "by_status": {
+      "pending": 2,
+      "running": 1,
+      "completed": 140,
+      "failed": 7
+    },
+    "success_rate": 0.952
+  },
+  "execution": {
+    "avg_duration_seconds": 1.25,
+    "total_steps_executed": 450
+  },
+  "tools": {
+    "total_executions": 450,
+    "by_tool": {
+      "calculator": 280,
+      "todo_store": 170
+    }
+  }
+}
+```
+
+**Use Cases:**
+- Monitor system health and performance
+- Track success rates and failure patterns
+- Identify most-used tools for optimization
+- Detect performance degradation over time
+
+---
+
 ## 🎨 Design Decisions & Trade-offs
 
 ### 1. Hybrid Planning Strategy: LLM + Pattern-Based Fallback
@@ -471,29 +620,32 @@ planner = LLMPlanner(
 
 ---
 
-### 5. Retry Strategy: Exponential Backoff
+### 5. Retry Strategy: Exponential Backoff with Timeout Protection
 
-**Chosen:** 3 attempts with exponential backoff (1s → 2s → 4s)
+**Chosen:** 3 attempts with exponential backoff (1s → 2s → 4s) + per-step timeout (default: 30s)
 **Why:**
 
 - ✅ **Handles Transient Failures**: Network hiccups, temporary unavailability
 - ✅ **Prevents Thundering Herd**: Exponential spacing reduces load
-- ✅ **Configurable**: Easy to adjust max attempts and delays
+- ✅ **Timeout Protection**: Prevents indefinite hangs with configurable timeout
+- ✅ **Configurable**: Easy to adjust max attempts, delays, and timeout
 - ✅ **Industry Standard**: Common pattern in distributed systems
 
 **Trade-off:**
 
 - ❌ **Increased Latency**: Failed operations take longer to complete
 - ❌ **No Jitter**: Could cause synchronized retries (not critical for POC)
+- ❌ **No Partial Results**: Timeout discards incomplete work
 
 **Production Alternative:**
 
 - Add jitter (±10%) to prevent retry storms
 - Implement circuit breaker pattern
-- Per-tool retry configuration (different tools, different strategies)
-- **Why Not Now:** Basic exponential backoff sufficient for demonstration
+- Per-tool retry and timeout configuration
+- Preserve partial results on timeout for resumption
+- **Why Not Now:** Basic exponential backoff with timeout sufficient for demonstration
 
-**Interview Note:** Production system would add jitter and circuit breakers.
+**Interview Note:** Production system would add jitter, circuit breakers, and partial result preservation.
 
 ---
 
@@ -617,9 +769,10 @@ test_max_retries_exceeded()  # Validates failure after 3 attempts
 
 3. **Execution Orchestration**
     - Sequential execution only (no parallel steps)
-    - Simple retry logic (no jitter, no circuit breaker)
+    - Retry logic without jitter (no circuit breaker pattern)
     - No idempotency support for retry safety
     - No cancellation mechanism for running operations
+    - No partial result preservation on timeout
 
 4. **Tool Limitations**
     - Calculator: Limited to basic operators (+, -, *, /, parentheses)
