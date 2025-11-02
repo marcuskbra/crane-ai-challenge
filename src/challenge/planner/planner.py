@@ -54,6 +54,27 @@ class PatternBasedPlanner:
         prompt_lower = prompt.lower().strip()
         steps: list[PlanStep] = []
 
+        # Special case: Handle "add todos for X, Y, and Z" pattern
+        # This creates multiple todo additions from a comma-separated list
+        multi_todo_pattern = r"add\s+(?:todos|tasks)\s+for\s+(.+)"
+        if match := re.search(multi_todo_pattern, prompt_lower):
+            items_text = match.group(1)
+            # Split on commas and "and"
+            items = re.split(r",\s*(?:and\s+)?|,?\s+and\s+", items_text)
+            for item in items:
+                item_clean = item.strip()
+                if item_clean:
+                    steps.append(
+                        PlanStep(
+                            step_number=len(steps) + 1,
+                            tool_name="todo_store",
+                            tool_input={"action": "add", "text": item_clean},
+                            reasoning=f"Add todo: {item_clean}",
+                        )
+                    )
+            if steps:
+                return Plan(steps=steps, final_goal=prompt)
+
         # Split on "and" or "then" for multi-step plans
         sub_prompts = re.split(r"\s+(?:and|then)\s+", prompt_lower)
 
@@ -80,7 +101,8 @@ class PatternBasedPlanner:
 
         """
         # Pattern 1: Calculator operations
-        calc_pattern = r"(?:calculate|compute|evaluate|math|solve)\s+(.+)"
+        # Matches: "calculate X", "what is X", "X divided by Y", "X plus Y", etc.
+        calc_pattern = r"(?:calculate|compute|evaluate|math|solve|what\s+is)\s+(.+)"
         if match := re.search(calc_pattern, prompt):
             expression = match.group(1).strip()
             return PlanStep(
@@ -90,9 +112,44 @@ class PatternBasedPlanner:
                 reasoning=f"Calculate: {expression}",
             )
 
-        # Pattern 2: Add todo
-        add_pattern = r"(?:add|create)\s+(?:a\s+)?(?:todo|task)(?:\s+(?:to|for|saying|that says))?\s+(.+)"
-        if match := re.search(add_pattern, prompt):
+        # Pattern 1b: Natural language math expressions without keywords
+        # Matches: "100 divided by 4", "5 plus 3", "10 minus 2", "multiply X by Y"
+        natural_math_pattern = r"(?:(?:\d+(?:\.\d+)?)|(?:that|it|result))\s+(?:divided\s+by|plus|minus|times|multiplied\s+by)\s+(?:\d+(?:\.\d+)?)"
+        if re.search(natural_math_pattern, prompt):
+            return PlanStep(
+                step_number=step_number,
+                tool_name="calculator",
+                tool_input={"expression": prompt},
+                reasoning=f"Calculate: {prompt}",
+            )
+
+        # Pattern 1c: Operation verbs (multiply, divide, add, subtract)
+        # Matches: "multiply that by 2", "divide this by 5", "add 10"
+        operation_pattern = r"(?:multiply|divide|add|subtract)\s+(.+)"
+        if re.search(operation_pattern, prompt):
+            return PlanStep(
+                step_number=step_number,
+                tool_name="calculator",
+                tool_input={"expression": prompt},
+                reasoning=f"Calculate: {prompt}",
+            )
+
+        # Pattern 2a: Add X as a todo/task
+        # Matches: "add the result as a todo", "add this as a task"
+        add_as_pattern = r"(?:add|create)\s+(.+?)\s+as\s+(?:a\s+)?(?:todo|task)"
+        if match := re.search(add_as_pattern, prompt):
+            text = match.group(1).strip()
+            return PlanStep(
+                step_number=step_number,
+                tool_name="todo_store",
+                tool_input={"action": "add", "text": text},
+                reasoning=f"Add todo: {text}",
+            )
+
+        # Pattern 2b: Add todo/task X
+        # Matches: "add todo X", "add task to do X", "add todo: X", "create a task for X"
+        add_todo_pattern = r"(?:add|create)\s+(?:a\s+)?(?:todo|task)(?:\s*:\s*|\s+(?:to|for|saying|that says)\s+)(.+)"
+        if match := re.search(add_todo_pattern, prompt):
             text = match.group(1).strip()
             return PlanStep(
                 step_number=step_number,
@@ -102,7 +159,8 @@ class PatternBasedPlanner:
             )
 
         # Pattern 3: List todos
-        list_pattern = r"(?:list|show|get|display|see)(?:\s+all)?(?:\s+(?:my|the))?\s+(?:todos|tasks)"
+        # Matches: "list todos", "show todos", "show me my todos", "see all tasks", etc.
+        list_pattern = r"(?:list|show|get|display|see)(?:\s+me)?(?:\s+all)?(?:\s+(?:my|the))?\s+(?:todos|tasks)"
         if re.search(list_pattern, prompt):
             return PlanStep(
                 step_number=step_number,
