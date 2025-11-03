@@ -7,6 +7,7 @@ Tests the complete flow: API → Orchestrator → Planner → Tools
 import asyncio
 
 import pytest
+from starlette.status import HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class TestRunsE2E:
@@ -187,7 +188,7 @@ class TestRunsE2E:
         )
 
         # Should fail validation
-        assert response.status_code == 422
+        assert response.status_code == HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_get_nonexistent_run(self, test_client):
         """Test 404 for nonexistent run."""
@@ -224,3 +225,125 @@ class TestRunsE2E:
 
         assert response1.json()["result"] == 2.0
         assert response2.json()["result"] == 4.0
+
+    @pytest.mark.asyncio
+    async def test_list_runs_default_pagination(self, test_client):
+        """Test listing runs with default pagination."""
+        # Create multiple runs
+        run_ids = []
+        for i in range(5):
+            response = test_client.post(
+                "/api/v1/runs",
+                json={"prompt": f"calculate {i} + 1"},
+            )
+            assert response.status_code == 201
+            run_ids.append(response.json()["run_id"])
+
+        # Wait for some execution
+        await asyncio.sleep(0.3)
+
+        # List runs (default: limit=10, offset=0)
+        response = test_client.get("/api/v1/runs")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 5  # At least our 5 runs
+
+        # Verify runs are in reverse chronological order (most recent first)
+        # The last created run should appear first
+        returned_ids = [run["run_id"] for run in data]
+        assert run_ids[-1] in returned_ids[:5]  # Most recent should be in first 5
+
+    @pytest.mark.asyncio
+    async def test_list_runs_with_limit(self, test_client):
+        """Test listing runs with custom limit."""
+        # Create multiple runs
+        for i in range(5):
+            response = test_client.post(
+                "/api/v1/runs",
+                json={"prompt": f"calculate {i} + 2"},
+            )
+            assert response.status_code == 201
+
+        await asyncio.sleep(0.3)
+
+        # List with limit=2
+        response = test_client.get("/api/v1/runs?limit=2")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) <= 2
+
+    @pytest.mark.asyncio
+    async def test_list_runs_with_offset(self, test_client):
+        """Test listing runs with offset."""
+        # Create multiple runs
+        run_ids = []
+        for i in range(5):
+            response = test_client.post(
+                "/api/v1/runs",
+                json={"prompt": f"calculate {i} + 3"},
+            )
+            assert response.status_code == 201
+            run_ids.append(response.json()["run_id"])
+
+        await asyncio.sleep(0.3)
+
+        # Get first page
+        response1 = test_client.get("/api/v1/runs?limit=2&offset=0")
+        assert response1.status_code == 200
+        page1 = response1.json()
+
+        # Get second page
+        response2 = test_client.get("/api/v1/runs?limit=2&offset=2")
+        assert response2.status_code == 200
+        page2 = response2.json()
+
+        # Pages should be different
+        page1_ids = {run["run_id"] for run in page1}
+        page2_ids = {run["run_id"] for run in page2}
+        assert len(page1_ids & page2_ids) == 0  # No overlap
+
+    def test_list_runs_invalid_limit(self, test_client):
+        """Test validation for invalid limit."""
+        # Limit too small
+        response = test_client.get("/api/v1/runs?limit=0")
+        assert response.status_code == 400
+        assert "limit" in response.json()["detail"].lower()
+
+        # Limit too large
+        response = test_client.get("/api/v1/runs?limit=101")
+        assert response.status_code == 400
+        assert "limit" in response.json()["detail"].lower()
+
+    def test_list_runs_invalid_offset(self, test_client):
+        """Test validation for invalid offset."""
+        response = test_client.get("/api/v1/runs?offset=-1")
+        assert response.status_code == 400
+        assert "offset" in response.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_list_runs_reverse_chronological(self, test_client):
+        """Test that runs are listed in reverse chronological order."""
+        # Create runs with small delays to ensure order
+        run_ids = []
+        for i in range(3):
+            response = test_client.post(
+                "/api/v1/runs",
+                json={"prompt": f"calculate {i} + 10"},
+            )
+            assert response.status_code == 201
+            run_ids.append(response.json()["run_id"])
+            await asyncio.sleep(0.1)  # Small delay between creations
+
+        # List runs
+        response = test_client.get("/api/v1/runs?limit=3")
+        assert response.status_code == 200
+
+        data = response.json()
+        returned_ids = [run["run_id"] for run in data[:3]]
+
+        # Most recent (last created) should be first
+        assert run_ids[-1] in returned_ids[:3]
