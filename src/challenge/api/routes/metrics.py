@@ -72,7 +72,7 @@ async def get_metrics(
         }
 
     """
-    runs = orchestrator.runs
+    runs = orchestrator.run_manager.list_runs()
 
     # Run statistics
     total_runs = len(runs)
@@ -89,7 +89,7 @@ async def get_metrics(
     total_steps = 0
     tool_executions: dict[str, int] = {}
 
-    for run in runs.values():
+    for run in runs:
         # Count by status
         status_counts[run.status.value] += 1
 
@@ -114,9 +114,20 @@ async def get_metrics(
         else 0.0
     )
 
-    # TODO: Implement actual planner metrics tracking in orchestrator
-    # For now, return default values (will be implemented in next step)
-    planner_metrics = PlannerMetrics()
+    # Calculate planner metrics from orchestrator stats
+    stats: dict[str, int | float] = orchestrator.metrics.get_stats()
+    llm_plans: int = int(stats.get("llm_plans", 0))
+    pattern_plans = int(stats.get("pattern_plans", 0))
+    total_plans: int = llm_plans + pattern_plans
+
+    planner_metrics = PlannerMetrics(
+        total_plans_generated=total_plans,
+        llm_plans=llm_plans,
+        pattern_plans=pattern_plans,
+        fallback_rate=round(pattern_plans / total_plans, 3) if total_plans > 0 else 0.0,
+        avg_tokens_per_plan=round(stats["total_tokens"] / llm_plans, 1) if llm_plans > 0 else 0.0,
+        avg_latency_ms=round(stats["total_latency_ms"] / total_plans, 1) if total_plans > 0 else 0.0,
+    )
 
     # Build typed response
     return MetricsResponse(

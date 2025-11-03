@@ -123,12 +123,10 @@ async def test_get_metrics_with_runs(orchestrator):
         final_goal="pending task",
     )
 
-    # Add runs to orchestrator
-    orchestrator.runs = {
-        completed_run.run_id: completed_run,
-        failed_run.run_id: failed_run,
-        pending_run.run_id: pending_run,
-    }
+    # Add runs to orchestrator via run_manager
+    orchestrator.run_manager.create_run(completed_run)
+    orchestrator.run_manager.create_run(failed_run)
+    orchestrator.run_manager.create_run(pending_run)
 
     # Get metrics - returns typed model
     metrics = await get_metrics(orchestrator=orchestrator)
@@ -167,7 +165,8 @@ async def test_get_metrics_success_rate_calculation(orchestrator):
     run2.started_at = datetime.now(timezone.utc)
     run2.completed_at = datetime.now(timezone.utc)
 
-    orchestrator.runs = {run1.run_id: run1, run2.run_id: run2}
+    orchestrator.run_manager.create_run(run1)
+    orchestrator.run_manager.create_run(run2)
 
     metrics = await get_metrics(orchestrator=orchestrator)
     assert isinstance(metrics, MetricsResponse)
@@ -188,7 +187,9 @@ async def test_get_metrics_success_rate_calculation(orchestrator):
     run1.status = RunStatus.COMPLETED
     run2.status = RunStatus.FAILED
 
-    orchestrator.runs = {run1.run_id: run1, run2.run_id: run2, run3.run_id: run3}
+    orchestrator.run_manager.create_run(run1)
+    orchestrator.run_manager.create_run(run2)
+    orchestrator.run_manager.create_run(run3)
 
     metrics = await get_metrics(orchestrator=orchestrator)
     assert isinstance(metrics, MetricsResponse)
@@ -252,7 +253,7 @@ async def test_get_metrics_tool_aggregation(orchestrator):
         ),
     ]
 
-    orchestrator.runs = {run.run_id: run}
+    orchestrator.run_manager.create_run(run)
 
     metrics = await get_metrics(orchestrator=orchestrator)
 
