@@ -21,6 +21,7 @@ from challenge.core.config import Settings, get_settings
 from challenge.orchestrator.orchestrator import Orchestrator
 from challenge.planner.llm_planner import LLMPlanner
 from challenge.planner.planner import PatternBasedPlanner
+from challenge.tools import ToolRegistry
 from challenge.tools.registry import get_tool_registry
 
 # ============================================================================
@@ -45,19 +46,34 @@ def get_orchestrator() -> Orchestrator:
     This hybrid approach provides:
     - Intelligent planning for complex requests via LLM
     - Automatic fallback to pattern-based on LLM failures
-    - Cost optimization with GPT-4o-mini
+    - Cost optimization with GPT-4o-mini (or local LLM via configuration)
     - Reliability through graceful degradation
+
+    The planner configuration is read from environment variables:
+    - OPENAI_API_KEY: API key (required for OpenAI, optional for local LLMs)
+    - OPENAI_BASE_URL: Custom base URL (e.g., http://localhost:4000 for LiteLLM)
+    - OPENAI_MODEL: Model name (default: gpt-4o-mini, can be local model like qwen2.5:3b)
+    - OPENAI_TEMPERATURE: Sampling temperature (default: 0.1)
 
     Returns:
         Orchestrator instance
 
     """
-    # Use LLM planner with pattern-based fallback for production resilience
-    planner = LLMPlanner(model="gpt-4o-mini", fallback=PatternBasedPlanner())
+    settings = get_settings()
 
+    # Use LLM planner with pattern-based fallback for production resilience
+    planner = LLMPlanner(
+        model=settings.openai_model,
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url,  # None for OpenAI, set for local LLMs
+        temperature=settings.openai_temperature,
+        fallback=PatternBasedPlanner(),
+    )
+
+    tool_registry: ToolRegistry = get_tool_registry()
     return Orchestrator(
         planner=planner,
-        tools=get_tool_registry(),
+        tools=tool_registry,
     )
 
 

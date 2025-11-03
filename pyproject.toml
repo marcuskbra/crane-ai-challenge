@@ -10,12 +10,10 @@ dependencies = [
     "httpx>=0.25.0",
     "aiofiles>=24.0.0",
     "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "python-multipart>=0.0.9",
+    "uvicorn[standard]>=0.38.0",
+    "python-multipart>=0.0.20",
     "pydantic-settings>=2.11.0",
     "openai>=1.0.0",
-    "sentence-transformers>=2.2.0",
-    "faiss-cpu>=1.7.0",
     "pytest>=8.4.2",
 ]
 
@@ -216,10 +214,15 @@ indent-style = "space"
 # pytest configuration
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["src"]
 markers = [
     "unit: Unit tests (fast, no external dependencies)",
     "integration: Integration tests (may require external services)",
     "contract: Contract tests (behavioral requirements for implementations)",
+    "slow: Slow tests (taking more than 1 second)",
+    "smoke: Smoke tests (basic sanity checks)",
+    "golden: Golden dataset evaluation tests (systematic quality measurement)",
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
@@ -227,6 +230,8 @@ python_classes = ["Test*", "*Test", "*Contract"]
 python_functions = ["test_*"]
 addopts = [
     "-ra",
+    "-v",
+    "--tb=short",
     "--strict-markers",
     "--strict-config",
 ]

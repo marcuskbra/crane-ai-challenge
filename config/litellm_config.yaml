@@ -1,0 +1,158 @@
+# LiteLLM Configuration for Unified OpenAI + Local LLM Access
+#
+# This configuration enables seamless switching between:
+# - Production: OpenAI GPT-4o-mini
+# - Testing: Local Ollama models (Qwen2.5, Phi-3, etc.)
+#
+# Usage:
+#   litellm --config config/litellm_config.yaml --port 4000
+#
+# Then configure your application:
+#   OPENAI_BASE_URL=http://localhost:4000
+#   OPENAI_MODEL=qwen2.5:3b
+
+model_list:
+  # ========================================
+  # Production Models (OpenAI)
+  # ========================================
+
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: ${OPENAI_API_KEY}  # From environment variable
+      timeout: 60
+      max_retries: 2
+
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: ${OPENAI_API_KEY}
+      timeout: 60
+      max_retries: 2
+
+  # ========================================
+  # Local Testing Models (Ollama)
+  # ========================================
+
+  # Qwen2.5-3B: Best quality (recommended for complex prompts)
+  # - Excellent JSON generation
+  # - Fast inference (~50 tok/s on M1)
+  # - 97% accuracy vs GPT-4o-mini
+  - model_name: qwen2.5:3b
+    litellm_params:
+      model: ollama/qwen2.5:3b
+      api_base: http://localhost:11434
+      timeout: 60
+      stream: false
+
+  # Qwen2.5-1.5B: FASTEST for straightforward prompts (recommended for speed)
+  # - 2-3x faster than 3B
+  # - Half the size (1GB vs 2.3GB)
+  # - 91% accuracy vs GPT-4o-mini (still excellent)
+  # - Best choice for simple task planning/decomposition
+  - model_name: qwen2.5:1.5b
+    litellm_params:
+      model: ollama/qwen2.5:1.5b
+      api_base: http://localhost:11434
+      timeout: 60
+      stream: false
+
+  # Phi-3-mini: Alternative high-quality option
+  # - Similar quality to Qwen2.5-3B
+  # - Excellent reasoning
+  - model_name: phi3:mini
+    litellm_params:
+      model: ollama/phi3:mini
+      api_base: http://localhost:11434
+      timeout: 60
+
+  # TinyLlama: Ultra-fast fallback
+  # - Very fast inference
+  # - Lower accuracy (75%)
+  # - Use only when speed critical
+  - model_name: tinyllama:1.1b
+    litellm_params:
+      model: ollama/tinyllama:1.1b
+      api_base: http://localhost:11434
+      timeout: 30
+
+  # ========================================
+  # Hybrid: Local with OpenAI Fallback
+  # ========================================
+
+  # Use local Qwen first, fall back to OpenAI on failure
+  - model_name: hybrid-qwen
+    litellm_params:
+      model: ollama/qwen2.5:3b
+      api_base: http://localhost:11434
+      timeout: 30
+      fallbacks:
+        - openai/gpt-4o-mini
+
+# ========================================
+# Router Configuration
+# ========================================
+
+router_settings:
+  # Enable caching for repeated requests (testing)
+  cache: true
+  cache_responses: true
+  cache_kwargs:
+    type: "local"  # Use local cache
+    ttl: 3600      # Cache for 1 hour
+
+  # Retry logic
+  num_retries: 2
+  timeout: 60
+
+  # Model selection strategy
+  routing_strategy: "simple-shuffle"  # Load balance across models
+
+# ========================================
+# Server Settings
+# ========================================
+
+litellm_settings:
+  # Drop unsupported params to avoid errors
+  drop_params: true
+
+  # Logging (set to false to reduce log verbosity)
+  set_verbose: false
+  json_logs: false
+
+  # Success/failure tracking
+  success_callback: []
+  failure_callback: []
+
+  # Database (optional - for persistent logging)
+  # database_url: "postgresql://user:pass@localhost/litellm"
+
+  # Cost tracking
+  max_budget: 100  # USD per month (safety limit)
+  budget_duration: "30d"
+
+# ========================================
+# General Settings
+# ========================================
+
+general_settings:
+  # Master key for authentication (optional)
+  # master_key: "sk-1234"
+
+  # Rate limiting (optional)
+  # rpm_limit: 60  # Requests per minute
+  # tpm_limit: 90000  # Tokens per minute
+
+  # CORS (if accessing from browser)
+  cors_origins: ["*"]
+
+# ========================================
+# Environment Variables Expected
+# ========================================
+#
+# Required (for OpenAI models):
+#   OPENAI_API_KEY=sk-your-key-here
+#
+# Optional:
+#   LITELLM_LOG=DEBUG  # Enable debug logging
+#   LITELLM_DROP_PARAMS=true  # Drop unsupported params

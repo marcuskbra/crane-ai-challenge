@@ -1,0 +1,235 @@
+# Docker Compose for Local LLM Testing
+#
+# This setup provides a complete containerized environment for testing
+# the Crane AI Agent Runtime with local LLMs (Ollama + LiteLLM).
+#
+# Usage:
+#   # Start all services
+#   docker-compose -f docker-compose.litellm.yml up -d
+#
+#   # Run tests
+#   docker-compose -f docker-compose.litellm.yml exec app pytest tests/
+#
+#   # View logs
+#   docker-compose -f docker-compose.litellm.yml logs -f litellm
+#
+#   # Stop services
+#   docker-compose -f docker-compose.litellm.yml down
+
+version: '3.8'
+
+services:
+  # ========================================
+  # Ollama: Local LLM Runtime
+  # ========================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: crane-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Persist models across restarts
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_NUM_PARALLEL=4  # Allow parallel requests
+      - OLLAMA_MAX_LOADED_MODELS=2  # Load up to 2 models in memory
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # Resource limits (adjust based on your system)
+    deploy:
+      resources:
+        limits:
+          memory: 6G  # 4G for model + 2G overhead
+          cpus: '4'
+        reservations:
+          memory: 4G
+          cpus: '2'
+    networks:
+      - crane-network
+
+  # ========================================
+  # Ollama Model Loader
+  # ========================================
+  # This service pulls the required models on first start
+  ollama-setup:
+    image: ollama/ollama:latest
+    container_name: crane-ollama-setup
+    depends_on:
+      ollama:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Pulling Qwen2.5-3B model...' &&
+        ollama pull qwen2.5:3b &&
+        echo 'Model ready!' &&
+        echo 'Optional: Pull alternative models' &&
+        # ollama pull phi3:mini &&
+        # ollama pull qwen2.5:1.5b &&
+        echo 'Setup complete!'
+      "
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    networks:
+      - crane-network
+    restart: "no"  # Run once
+
+  # ========================================
+  # LiteLLM: Unified API Proxy
+  # ========================================
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: crane-litellm
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config/litellm_config.yaml:/app/config.yaml:ro
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-1234}  # Optional auth
+      - OPENAI_API_KEY=${OPENAI_API_KEY}  # For fallback to OpenAI
+      - LITELLM_LOG=INFO
+      - DATABASE_URL=${LITELLM_DATABASE_URL:-}  # Optional persistent logging
+    command: --config /app/config.yaml --port 4000 --detailed_debug
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - crane-network
+
+  # ========================================
+  # Application: Crane AI Agent Runtime
+  # ========================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crane-app
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source code for development
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
+      - ./config:/app/config:ro
+    environment:
+      # LLM Configuration (point to LiteLLM proxy)
+      - OPENAI_BASE_URL=http://litellm:4000
+      - OPENAI_MODEL=qwen2.5:3b
+      - OPENAI_TEMPERATURE=0.1
+
+      # Application Settings
+      - ENVIRONMENT=test
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+
+      # Orchestrator Configuration
+      - MAX_RETRIES=3
+      - STEP_TIMEOUT=30.0
+    depends_on:
+      litellm:
+        condition: service_healthy
+    command: ["uvicorn", "challenge.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - crane-network
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  crane-network:
+    driver: bridge
+
+# ========================================
+# Volumes
+# ========================================
+volumes:
+  ollama-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/.docker/ollama  # Persist in project directory
+
+# ========================================
+# Usage Examples
+# ========================================
+#
+# 1. Start all services:
+#    docker-compose -f docker-compose.litellm.yml up -d
+#
+# 2. Check service health:
+#    docker-compose -f docker-compose.litellm.yml ps
+#
+# 3. View logs:
+#    docker-compose -f docker-compose.litellm.yml logs -f
+#    docker-compose -f docker-compose.litellm.yml logs -f litellm
+#    docker-compose -f docker-compose.litellm.yml logs -f ollama
+#
+# 4. Run tests:
+#    docker-compose -f docker-compose.litellm.yml exec app pytest tests/ -v
+#
+# 5. Interactive shell:
+#    docker-compose -f docker-compose.litellm.yml exec app bash
+#
+# 6. Test API directly:
+#    curl http://localhost:8000/health
+#    curl -X POST http://localhost:8000/runs \
+#      -H "Content-Type: application/json" \
+#      -d '{"prompt": "calculate 2+2"}'
+#
+# 7. Test LiteLLM proxy:
+#    curl http://localhost:4000/health
+#    curl http://localhost:4000/v1/models
+#
+# 8. Test Ollama directly:
+#    curl http://localhost:11434/api/tags
+#
+# 9. Stop all services:
+#    docker-compose -f docker-compose.litellm.yml down
+#
+# 10. Clean up everything (including volumes):
+#     docker-compose -f docker-compose.litellm.yml down -v
+#     rm -rf .docker/ollama
+
+# ========================================
+# Troubleshooting
+# ========================================
+#
+# Issue: Ollama model not found
+# Solution:
+#   docker-compose -f docker-compose.litellm.yml exec ollama ollama pull qwen2.5:3b
+#
+# Issue: LiteLLM can't connect to Ollama
+# Solution:
+#   docker-compose -f docker-compose.litellm.yml logs ollama
+#   docker-compose -f docker-compose.litellm.yml restart litellm
+#
+# Issue: Out of memory
+# Solution:
+#   # Reduce model size
+#   docker-compose -f docker-compose.litellm.yml exec ollama ollama pull qwen2.5:1.5b
+#   # Or increase Docker memory limit in Docker Desktop
+#
+# Issue: Slow model loading
+# Solution:
+#   # Models are cached after first pull
+#   # Check cache: ls -lh .docker/ollama/models/

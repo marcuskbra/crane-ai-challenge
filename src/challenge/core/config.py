@@ -8,7 +8,7 @@ All settings are loaded from environment variables with sensible defaults.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -145,6 +145,64 @@ class Settings(BaseSettings):
     )
 
     # ============================================================================
+    # LLM Configuration
+    # ============================================================================
+
+    openai_api_key: str | None = Field(
+        default=None,
+        description="OpenAI API key (required for OpenAI, dummy value for local LLMs)",
+    )
+
+    openai_base_url: str | None = Field(
+        default=None,
+        description="Custom OpenAI API base URL for local LLMs (e.g., http://localhost:4000 for LiteLLM, http://localhost:11434/v1 for Ollama)",
+    )
+
+    openai_model: str = Field(
+        default="gpt-4o-mini",
+        description="LLM model name (e.g., 'gpt-4o-mini' for OpenAI, 'qwen2.5:3b' for local models)",
+    )
+
+    openai_temperature: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=2.0,
+        description="LLM sampling temperature (lower = more deterministic)",
+    )
+
+    @model_validator(mode="after")
+    def validate_llm_config(self) -> "Settings":
+        """
+        Validate LLM configuration and provide dummy API key when needed.
+
+        The OpenAI client requires an API key even when using custom base_url.
+        This validator runs after all fields are loaded and provides:
+        - Dummy key "sk-local-llm-dummy-key" when base_url is set (local LLM)
+        - Dummy key "sk-no-key-pattern-fallback" when neither is set (pattern-based fallback)
+
+        Returns:
+            Settings: Self with validated/updated API key
+
+        Note:
+            This ensures the application can start even without API key,
+            relying on the pattern-based planner fallback.
+
+        """
+        # If API key is already provided, use it
+        if self.openai_api_key:
+            return self
+
+        # If using local LLM (base_url is set), provide dummy key
+        if self.openai_base_url:
+            self.openai_api_key = "sk-local-llm-dummy-key"
+            return self
+
+        # No API key and no base_url - will use pattern-based planner fallback
+        # Return dummy key to allow initialization
+        self.openai_api_key = "sk-no-key-pattern-fallback"
+        return self
+
+    # ============================================================================
     # Logging Configuration
     # ============================================================================
 
@@ -226,6 +284,34 @@ class Settings(BaseSettings):
             return headers if headers else ["Content-Type"]
         return v
 
+    @field_validator("openai_base_url")
+    @classmethod
+    def validate_base_url(cls, v: str | None) -> str | None:
+        """
+        Validate OpenAI base URL format.
+
+        Args:
+            v: Base URL string or None
+
+        Returns:
+            Validated base URL or None
+
+        Raises:
+            ValueError: If URL format is invalid
+
+        """
+        if v is not None:
+            # Basic URL format validation
+            if not v.startswith(("http://", "https://")):
+                raise ValueError(
+                    f"OpenAI base URL must start with http:// or https://, got: {v}\n"
+                    "Examples:\n"
+                    "  - http://localhost:4000 (LiteLLM proxy)\n"
+                    "  - http://localhost:11434/v1 (Ollama)\n"
+                    "  - http://localhost:1234/v1 (LM Studio)"
+                )
+        return v
+
     @field_validator("environment")
     @classmethod
     def validate_environment(cls, v: str) -> str:
@@ -266,6 +352,44 @@ class Settings(BaseSettings):
         if self.api_docs_enabled and not self.is_production():
             return "/api/redoc"
         return None
+
+    def is_using_local_llm(self) -> bool:
+        """
+        Check if configured to use local LLM.
+
+        Returns:
+            True if base_url is configured (indicating local LLM), False otherwise
+
+        """
+        return self.openai_base_url is not None
+
+    def get_llm_config_status(self) -> dict[str, str]:
+        """
+        Get human-readable LLM configuration status.
+
+        Returns:
+            Dictionary with LLM configuration details for logging/debugging
+
+        Example:
+            >>> settings = Settings()
+            >>> status = settings.get_llm_config_status()
+            >>> print(status["provider"])
+            'OpenAI' or 'Local LLM'
+
+        """
+        if self.is_using_local_llm():
+            return {
+                "provider": "Local LLM",
+                "base_url": self.openai_base_url or "Not configured",
+                "model": self.openai_model,
+                "api_key_set": "Yes (dummy)" if self.openai_api_key else "No",
+            }
+        return {
+            "provider": "OpenAI",
+            "base_url": "Default (https://api.openai.com/v1)",
+            "model": self.openai_model,
+            "api_key_set": "Yes" if self.openai_api_key else "No (will fail)",
+        }
 
 
 @lru_cache
