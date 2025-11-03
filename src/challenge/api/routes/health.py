@@ -21,10 +21,11 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
 from challenge.api.dependencies import SettingsDep
+from challenge.core.exceptions import ServiceUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,10 @@ async def readiness_check() -> ReadinessResponse:
     - Database connection available
     - Cache connection available
     - External API dependencies reachable
+
+    Raises:
+        ServiceUnavailableError: If any critical service is not ready
+
     """
     # Perform readiness checks
     checks = {
@@ -208,14 +213,11 @@ async def readiness_check() -> ReadinessResponse:
     ready = all(checks.values())
 
     if not ready:
+        failed_services = [name for name, status in checks.items() if not status]
         logger.warning("Readiness check failed: %s", checks)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "ready": False,
-                "checks": checks,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
+        raise ServiceUnavailableError(
+            service=", ".join(failed_services),
+            reason="Service checks failed",
         )
 
     return ReadinessResponse(

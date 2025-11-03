@@ -13,14 +13,12 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import ValidationError
 
 from challenge import __version__
+from challenge.api.exception_handlers import register_exception_handlers
 from challenge.api.routes import health, metrics, runs
 from challenge.core.config import Settings, get_settings
 
@@ -84,8 +82,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Add middleware
     _configure_middleware(app, settings)
 
-    # Register error handlers
-    _register_error_handlers(app, settings)
+    # Register centralized exception handlers
+    # Note: This replaces the old _register_error_handlers function
+    register_exception_handlers(app)
 
     # Register routes
     _register_routes(app)
@@ -153,69 +152,6 @@ def _configure_middleware(app: FastAPI, settings: Settings) -> None:
         )
 
         return response
-
-
-def _register_error_handlers(app: FastAPI, settings: Settings) -> None:
-    """
-    Register custom error handlers for API exceptions.
-
-    Handles FastAPI and Pydantic validation errors with consistent responses.
-    Custom exceptions should be handled at the endpoint level by raising
-    appropriate HTTPException instances.
-
-    Args:
-        app: FastAPI application instance
-        settings: Application settings
-
-    """
-
-    @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
-        """Handle FastAPI request validation errors."""
-        logger.warning("Validation error: %s", exc.errors())
-
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            content={
-                "error": "validation_error",
-                "message": "Request validation failed",
-                "details": exc.errors(),
-            },
-        )
-
-    @app.exception_handler(ValidationError)
-    async def pydantic_validation_handler(_: Request, exc: ValidationError) -> JSONResponse:
-        """Handle Pydantic validation errors."""
-        logger.warning("Pydantic validation error: %s", exc.errors())
-
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            content={
-                "error": "validation_error",
-                "message": "Data validation failed",
-                "details": exc.errors(),
-            },
-        )
-
-    @app.exception_handler(Exception)
-    async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
-        """Handle unexpected exceptions."""
-        logger.exception("Unhandled exception: %s", str(exc))
-
-        content = {
-            "error": "internal_error",
-            "message": "An unexpected error occurred",
-        }
-
-        # Include error details in development/staging for debugging
-        if not settings.is_production():
-            content["detail"] = str(exc)
-            content["type"] = type(exc).__name__
-
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=content,
-        )
 
 
 def _register_routes(app: FastAPI) -> None:

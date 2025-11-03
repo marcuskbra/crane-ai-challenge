@@ -7,9 +7,10 @@ This module provides endpoints for creating and retrieving run executions.
 import logging
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from challenge.api.dependencies import OrchestratorDep
+from challenge.core.exceptions import RunNotFoundError
 from challenge.models.run import Run
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,13 @@ class RunCreate(BaseModel):
         description="Natural language task to execute",
         examples=["calculate 2 + 3", "add todo Buy milk"],
     )
+
+    @field_validator("prompt")
+    @classmethod
+    def _validate_prompt(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Prompt cannot be empty or whitespace-only")
+        return v.strip()
 
 
 @router.post(
@@ -64,28 +72,64 @@ async def create_run(request: RunCreate, orchestrator: OrchestratorDep) -> Run:
         Run instance with run_id for status tracking
 
     Raises:
-        HTTPException: 400 if prompt is invalid or planning fails
+        InvalidPromptError: If prompt is invalid or empty
+        PlanGenerationError: If planning fails
+
+    Note:
+        Exceptions are handled by centralized exception handlers.
+        No try/except needed in route handlers.
 
     """
-    try:
-        run = await orchestrator.create_run(request.prompt)
-        logger.info(f"Created run {run.run_id} with prompt: {request.prompt}")
-        return run
+    run = await orchestrator.create_run(request.prompt)
+    logger.info(f"Created run {run.run_id} with prompt: {request.prompt}")
+    return run
 
-    except ValueError as e:
-        # Planning or validation error
-        logger.warning(f"Invalid prompt: {e}")
+
+@router.get(
+    "/runs",
+    response_model=list[Run],
+    summary="List runs",
+    description="Retrieve a list of runs with pagination, in reverse chronological order (most recent first).",
+    tags=["runs"],
+)
+async def list_runs(
+    orchestrator: OrchestratorDep,
+    limit: int = 10,
+    offset: int = 0,
+) -> list[Run]:
+    """
+    List runs with pagination.
+
+    Returns runs in reverse chronological order (most recent first).
+
+    Args:
+        limit: Maximum number of runs to return (default: 10, max: 100)
+        offset: Number of runs to skip (default: 0)
+        orchestrator: Injected orchestrator instance
+
+    Returns:
+        List of Run instances
+
+    Raises:
+        HTTPException: 400 if parameters are invalid
+
+    """
+    # Validate parameters
+    if limit < 1 or limit > 100:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid prompt: {e!s}",
-        ) from e
-    except Exception as e:
-        # Unexpected error
-        logger.error(f"Failed to create run: {e}", exc_info=True)
+            detail="Limit must be between 1 and 100",
+        )
+
+    if offset < 0:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create run: {e!s}",
-        ) from e
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Offset must be non-negative",
+        )
+
+    runs = orchestrator.list_runs(limit=limit, offset=offset)
+    logger.debug(f"Listed {len(runs)} runs (limit={limit}, offset={offset})")
+    return runs
 
 
 @router.get(
@@ -114,16 +158,15 @@ async def get_run(run_id: str, orchestrator: OrchestratorDep) -> Run:
         Run instance with complete state
 
     Raises:
-        HTTPException: 404 if run not found
+        RunNotFoundError: If run doesn't exist
+
+    Note:
+        Exceptions are handled by centralized exception handlers.
 
     """
-    run = orchestrator.get_run(run_id)
+    run: Run | None = orchestrator.get_run(run_id)
 
     if not run:
-        logger.warning(f"Run not found: {run_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Run not found: {run_id}",
-        )
+        raise RunNotFoundError(run_id)
 
     return run
