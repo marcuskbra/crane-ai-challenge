@@ -25,6 +25,7 @@ class SafeCalculator(ast.NodeVisitor):
         - Subtraction (-)
         - Multiplication (*)
         - Division (/)
+        - Exponentiation (**)
         - Unary negation (-)
         - Numbers (integers and floats)
     """
@@ -34,6 +35,7 @@ class SafeCalculator(ast.NodeVisitor):
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
         ast.Div: operator.truediv,
+        ast.Pow: operator.pow,  # Exponentiation (power)
         ast.USub: operator.neg,  # Unary minus for negative numbers
         ast.UAdd: operator.pos,  # Unary plus for positive numbers
     }
@@ -142,13 +144,13 @@ class CalculatorTool(BaseTool):
         """Get calculator tool metadata."""
         return ToolMetadata(
             name="calculator",
-            description="Safely evaluate arithmetic expressions (addition, subtraction, multiplication, division)",
+            description="Safely evaluate arithmetic expressions (addition, subtraction, multiplication, division, exponentiation)",
             input_schema={
                 "type": "object",
                 "properties": {
                     "expression": {
                         "type": "string",
-                        "description": "Arithmetic expression to evaluate (e.g., '2 + 3 * 4')",
+                        "description": "Arithmetic expression to evaluate (e.g., '2 + 3 * 4', '2 ** 3')",
                     }
                 },
                 "required": ["expression"],

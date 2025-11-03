@@ -2,7 +2,8 @@
 Execution engine for running plan steps with retry logic.
 
 This module provides the execution engine that runs individual plan steps
-with exponential backoff retry and timeout handling.
+with exponential backoff retry and timeout handling, including support for
+variable resolution between steps via ExecutionContext.
 """
 
 import asyncio
@@ -10,6 +11,7 @@ import logging
 
 from challenge.models.plan import PlanStep
 from challenge.models.run import ExecutionStep
+from challenge.orchestrator.execution_context import ExecutionContext
 from challenge.orchestrator.protocols import ToolProvider
 
 logger = logging.getLogger(__name__)
@@ -123,16 +125,27 @@ class ExecutionEngine:
             attempts=self.max_retries,
         )
 
-    async def execute_plan(self, plan_steps: list[PlanStep], step_timeout: float = 30.0) -> list[ExecutionStep]:
+    async def execute_plan(
+        self,
+        plan_steps: list[PlanStep],
+        step_timeout: float = 30.0,
+        context: ExecutionContext | None = None,
+    ) -> list[ExecutionStep]:
         """
-        Execute all steps in a plan sequentially.
+        Execute all steps in a plan sequentially with variable resolution.
 
         Each step is executed with timeout protection. If a step fails,
         execution stops and returns the results up to that point.
 
+        When ExecutionContext is provided:
+        - Variables in tool_input are resolved from context
+        - Step outputs are recorded in context for later steps
+        - Enables multi-step workflows with data dependencies
+
         Args:
             plan_steps: List of plan steps to execute
             step_timeout: Timeout in seconds for each step (default: 30.0)
+            context: Optional execution context for variable resolution
 
         Returns:
             List of ExecutionStep results (may be incomplete if step fails)
@@ -140,28 +153,68 @@ class ExecutionEngine:
         Raises:
             None - failures are captured in ExecutionStep.error
 
-        Example:
+        Example (without context):
             >>> plan = [
             ...     PlanStep(1, "calculator", {"expression": "2 + 2"}),
             ...     PlanStep(2, "calculator", {"expression": "5 * 3"}),
             ... ]
             >>> results = await engine.execute_plan(plan)
             >>> assert len(results) == 2
-            >>> assert all(r.success for r in results)
+
+        Example (with context for variable resolution):
+            >>> context = ExecutionContext()
+            >>> plan = [
+            ...     PlanStep(1, "todo_store", {"action": "list"}),
+            ...     PlanStep(2, "todo_store", {"action": "complete", "todo_id": "{first_todo_id}"}),
+            ... ]
+            >>> results = await engine.execute_plan(plan, context=context)
+            >>> # Step 2's {first_todo_id} is resolved from step 1's output
 
         """
         execution_log: list[ExecutionStep] = []
 
         for step in plan_steps:
+            # Resolve variables in tool_input if context provided
+            tool_input = step.tool_input
+            if context:
+                try:
+                    tool_input = context.resolve_variables(step.tool_input)
+                    if tool_input != step.tool_input:
+                        logger.info(
+                            f"Step {step.step_number}: Resolved variables in tool_input: "
+                            f"{step.tool_input} → {tool_input}"
+                        )
+                except ValueError as e:
+                    # Variable resolution failed - record as error
+                    step_result = ExecutionStep(
+                        step_number=step.step_number,
+                        tool_name=step.tool_name,
+                        tool_input=step.tool_input,
+                        success=False,
+                        error=f"Variable resolution failed: {e}",
+                        attempts=1,
+                    )
+                    logger.error(f"Step {step.step_number} variable resolution failed: {e}")
+                    execution_log.append(step_result)
+                    break
+
+            # Create step with resolved input
+            resolved_step = PlanStep(
+                step_number=step.step_number,
+                tool_name=step.tool_name,
+                tool_input=tool_input,
+                reasoning=step.reasoning,
+            )
+
             try:
                 # Execute step with timeout
-                step_result = await asyncio.wait_for(self.execute_step_with_retry(step), timeout=step_timeout)
+                step_result = await asyncio.wait_for(self.execute_step_with_retry(resolved_step), timeout=step_timeout)
             except asyncio.TimeoutError:
                 # Step timed out
                 step_result = ExecutionStep(
                     step_number=step.step_number,
                     tool_name=step.tool_name,
-                    tool_input=step.tool_input,
+                    tool_input=tool_input,
                     success=False,
                     error=f"Step timed out after {step_timeout}s",
                     attempts=1,
@@ -169,6 +222,10 @@ class ExecutionEngine:
                 logger.error(f"Step {step.step_number} timed out after {step_timeout}s")
 
             execution_log.append(step_result)
+
+            # Record step output in context (even if failed)
+            if context:
+                context.record_step(step_result)
 
             # Stop on first failure
             if not step_result.success:

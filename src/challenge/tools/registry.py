@@ -18,6 +18,9 @@ class ToolRegistry:
     The registry provides a centralized way to discover and access tools
     by name. Tools are initialized once and reused for efficiency.
 
+    This class implements the ToolProvider protocol through structural
+    subtyping (duck typing). No explicit inheritance required.
+
     Example:
         >>> registry = ToolRegistry()
         >>> calculator = registry.get("calculator")

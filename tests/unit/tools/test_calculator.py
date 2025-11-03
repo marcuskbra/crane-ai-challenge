@@ -121,11 +121,32 @@ class TestCalculatorTool:
         assert "syntax" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_unsupported_operator_power(self, calculator):
-        """Test rejection of power operator (security)."""
-        result = await calculator.execute(expression="2 ** 10")
-        assert result.success is False
-        assert "unsupported" in result.error.lower() or "syntax" in result.error.lower()
+    async def test_power_operator(self, calculator):
+        """Test power/exponentiation operator."""
+        result = await calculator.execute(expression="2 ** 3")
+        assert result.success is True
+        assert result.output == 8.0
+
+    @pytest.mark.asyncio
+    async def test_power_operator_with_negative_exponent(self, calculator):
+        """Test power operator with negative exponent."""
+        result = await calculator.execute(expression="2 ** -1")
+        assert result.success is True
+        assert result.output == 0.5
+
+    @pytest.mark.asyncio
+    async def test_power_operator_precedence(self, calculator):
+        """Test power operator precedence (higher than multiplication)."""
+        result = await calculator.execute(expression="2 + 3 ** 2")
+        assert result.success is True
+        assert result.output == 11.0  # 2 + 9, not (2+3)**2=25
+
+    @pytest.mark.asyncio
+    async def test_power_operator_with_parentheses(self, calculator):
+        """Test power operator with parentheses."""
+        result = await calculator.execute(expression="(2 + 3) ** 2")
+        assert result.success is True
+        assert result.output == 25.0
 
     @pytest.mark.asyncio
     async def test_unsupported_operator_modulo(self, calculator):
