@@ -125,8 +125,11 @@ class PatternBasedPlanner:
 
         # Pattern 1c: Operation verbs (multiply, divide, add, subtract)
         # Matches: "multiply that by 2", "divide this by 5", "add 10"
-        operation_pattern = r"(?:multiply|divide|add|subtract)\s+(.+)"
-        if re.search(operation_pattern, prompt):
+        # Excludes: "add todo", "add task" (use negative lookahead)
+        operation_pattern = r"(?:multiply|divide|subtract)\s+(.+)|(?:add)\s+(?!(?:a\s+)?(?:todo|task)\b)(.+)"
+        if match := re.search(operation_pattern, prompt):
+            # Get the captured group (either group 1 or 2)
+            expression = match.group(1) or match.group(2)
             return PlanStep(
                 step_number=step_number,
                 tool_name="calculator",
@@ -147,16 +150,20 @@ class PatternBasedPlanner:
             )
 
         # Pattern 2b: Add todo/task X
-        # Matches: "add todo X", "add task to do X", "add todo: X", "create a task for X"
-        add_todo_pattern = r"(?:add|create)\s+(?:a\s+)?(?:todo|task)(?:\s*:\s*|\s+(?:to|for|saying|that says)\s+)(.+)"
+        # Matches: "add todo X", "add task X", "add todo: X", "add task to do X", "create a task for X"
+        # Updated to support simple "add todo X" format without requiring keywords
+        add_todo_pattern = r"(?:add|create)\s+(?:a\s+)?(?:todo|task)(?:\s*:\s*|\s+(?:to|for|saying|that says)\s+)?(.+)"
         if match := re.search(add_todo_pattern, prompt):
             text = match.group(1).strip()
-            return PlanStep(
-                step_number=step_number,
-                tool_name="todo_store",
-                tool_input={"action": "add", "text": text},
-                reasoning=f"Add todo: {text}",
-            )
+            # Avoid matching calculator patterns that start with "add"
+            # If the text starts with a number or math operation, skip this pattern
+            if not re.match(r"^\d+|\s*[\+\-\*/]", text):
+                return PlanStep(
+                    step_number=step_number,
+                    tool_name="todo_store",
+                    tool_input={"action": "add", "text": text},
+                    reasoning=f"Add todo: {text}",
+                )
 
         # Pattern 3: List todos
         # Matches: "list todos", "show todos", "show me my todos", "see all tasks", etc.

@@ -69,6 +69,7 @@ class LLMPlanner:
         self,
         model: str = "gpt-4o-mini",
         api_key: str | None = None,
+        base_url: str | None = None,
         fallback: PatternBasedPlanner | None = None,
         temperature: float = 0.1,
         use_examples: bool = True,
@@ -79,13 +80,25 @@ class LLMPlanner:
         Args:
             model: OpenAI model name (default: gpt-4o-mini for cost efficiency)
             api_key: OpenAI API key (uses env var if None)
+            base_url: Custom API base URL (default: None for OpenAI, set for local LLMs via LiteLLM)
             fallback: Fallback planner for LLM failures (creates default if None)
             temperature: Sampling temperature (low for consistency)
             use_examples: Whether to include few-shot examples in system prompt (default: True)
 
+        Example:
+            # Use OpenAI (default)
+            planner = LLMPlanner()
+
+            # Use local LLM via LiteLLM proxy
+            planner = LLMPlanner(
+                model="qwen2.5:3b",
+                base_url="http://localhost:4000"
+            )
+
         """
-        self.client = AsyncOpenAI(api_key=api_key)
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model = model
+        self.base_url = base_url
         self.fallback = fallback or PatternBasedPlanner()
         self.temperature = temperature
         self.use_examples = use_examples
