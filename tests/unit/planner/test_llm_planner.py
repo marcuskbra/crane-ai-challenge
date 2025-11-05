@@ -54,9 +54,7 @@ async def test_llm_planner_multi_step(mock_openai):
     mock_response.choices = [
         MagicMock(
             message=MagicMock(
-                content='{"steps": ['
-                        '{"step_number": 1, "tool_name": "calculator", "tool_input": {"expression": "2+3"}, '
-                        '"reasoning": "Calculate sum"}, {"step_number": 2, "tool_name": "todo_store", "tool_input": {"action": "add", "text": "Buy milk"}, "reasoning": "Add todo item"}], "final_goal": "Calculate and add todo"}'
+                content='{"steps": [{"step_number": 1, "tool_name": "calculator", "tool_input": {"expression": "2+3"}, "reasoning": "Calculate sum"}, {"step_number": 2, "tool_name": "todo_store", "tool_input": {"action": "add", "text": "Buy milk"}, "reasoning": "Add todo item"}], "final_goal": "Calculate and add todo"}'
             )
         )
     ]
