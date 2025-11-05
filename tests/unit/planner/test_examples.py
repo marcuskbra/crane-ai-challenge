@@ -140,8 +140,8 @@ class TestExampleCollection:
     """Tests for example collection integrity and structure."""
 
     def test_all_examples_count(self):
-        """Test that we have exactly 5 examples."""
-        assert len(ALL_EXAMPLES) == 5
+        """Test that we have exactly 8 examples."""
+        assert len(ALL_EXAMPLES) == 8
 
     def test_all_examples_are_valid(self):
         """Test that all examples are valid FewShotExample instances."""
@@ -283,17 +283,18 @@ class TestLLMPlannerIntegration:
         assert any(prompt in system_prompt for prompt in example_prompts)
 
     def test_llm_planner_with_examples_disabled(self):
-        """Test that LLM planner excludes examples when disabled."""
+        """Test that LLM planner excludes few-shot examples when disabled."""
         planner = LLMPlanner(use_examples=False, api_key="dummy-key-for-testing")
         system_prompt = planner._system_prompt()
 
-        # Should NOT include few-shot examples section (look for specific marker)
-        assert "examples of good planning patterns" not in system_prompt.lower()
-        assert "User:" not in system_prompt  # User: prefix only appears in few-shot examples
+        # Should NOT include few-shot examples section header
+        assert "Here are examples of good planning patterns" not in system_prompt
 
-        # Should NOT include example prompts
-        example_prompts = [ex.prompt for ex in ALL_EXAMPLES]
-        assert not any(prompt in system_prompt for prompt in example_prompts)
+        # Should NOT include the reasoning section from formatted examples
+        # (format_example_for_prompt includes "Reasoning: {example.reasoning}")
+        # Documentation examples don't have this "Reasoning:" label
+        example_reasonings = [ex.reasoning.strip()[:50] for ex in ALL_EXAMPLES]  # First 50 chars
+        assert not any(reasoning in system_prompt for reasoning in example_reasonings)
 
     def test_llm_planner_default_uses_examples(self):
         """Test that LLM planner uses examples by default."""

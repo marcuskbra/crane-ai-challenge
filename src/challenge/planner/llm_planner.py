@@ -182,7 +182,32 @@ Rules:
 - Break complex tasks into sequential steps
 - Use specific tool inputs (don't invent new tools)
 - Provide clear reasoning for each step
-- Number steps sequentially starting from 1"""
+- Number steps sequentially starting from 1
+
+Variable Resolution:
+CRITICAL: When a step needs data from a previous step's output, you MUST use ONLY these exact variable patterns:
+- {step_N_output} - Full output from step N (replace N with step number, e.g., {step_1_output}, {step_2_output})
+- {first_todo_id} - ID of first item in a list output
+- {last_todo_id} - ID of last item in a list output
+- {step_N_first_id} - First ID from step N's list output
+- {step_N_count} - Count of items from step N's list output
+
+DO NOT use custom variable names like {calculation_result}, {result}, {value}, etc.
+ALWAYS use {step_N_output} where N is the step number.
+
+Examples:
+1. Calculator workflow:
+   User: "Calculate (42 * 8) + 15, then multiply by 2"
+   Step 1: {"expression": "(42 * 8) + 15"}
+   Step 2: {"expression": "{step_1_output} * 2"} ✓ CORRECT - uses {step_1_output}
+   Step 2: {"expression": "{calculation_result} * 2"} ✗ WRONG - custom variable name
+
+2. Todo workflow:
+   User: "List all my todos and mark the first one as complete"
+   Step 1: {"action": "list"}
+   Step 2: {"action": "complete", "todo_id": "{first_todo_id}"} ✓ CORRECT
+
+IMPORTANT: Always use curly braces {} for variable references, never angle brackets <>"""
 
         # Add few-shot examples if enabled
         if self.use_examples:

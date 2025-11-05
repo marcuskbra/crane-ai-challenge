@@ -5,6 +5,7 @@ Tests step execution, retry logic, and error handling.
 """
 
 import asyncio
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -128,8 +129,9 @@ class TestExecutionEngine:
         assert result.attempts == 2
 
     @pytest.mark.asyncio
-    async def test_execute_step_exhaust_retries(self, mock_tools):
-        """Test all retries exhausted."""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_execute_step_exhaust_retries(self, mock_sleep, mock_tools):
+        """Test all retries exhausted without waiting."""
         failing_tool = MockTool("always_fails", should_fail=True)
         mock_tools.tools["always_fails"] = failing_tool
         engine = ExecutionEngine(tools=mock_tools, max_retries=3)
@@ -148,6 +150,7 @@ class TestExecutionEngine:
         assert "Failed after 3 attempts" in result.error
         assert result.attempts == 3
         assert failing_tool.call_count == 3
+        assert mock_sleep.call_count == 2  # 2 delays between 3 attempts
 
     @pytest.mark.asyncio
     async def test_execute_plan_all_steps_succeed(self, engine, mock_tools):
@@ -182,8 +185,9 @@ class TestExecutionEngine:
         assert results[2].output == 4.0
 
     @pytest.mark.asyncio
-    async def test_execute_plan_stops_on_first_failure(self, engine, mock_tools):
-        """Test plan execution stops at first failed step."""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_execute_plan_stops_on_first_failure(self, mock_sleep, engine, mock_tools):
+        """Test plan execution stops at first failed step without retry delays."""
         failing_tool = MockTool("fail", should_fail=True)
         mock_tools.tools["fail"] = failing_tool
 
@@ -215,6 +219,7 @@ class TestExecutionEngine:
         assert results[1].success is False
         # Third step never executed
         assert mock_tools.tools["calculator"].call_count == 1  # Only first step
+        assert mock_sleep.call_count == 2  # 2 delays from failing step retries
 
     @pytest.mark.asyncio
     async def test_execute_plan_with_timeout(self, engine, mock_tools):
@@ -245,8 +250,9 @@ class TestExecutionEngine:
         assert results[0].attempts == 1
 
     @pytest.mark.asyncio
-    async def test_exponential_backoff_delays(self, mock_tools):
-        """Test exponential backoff retry delays."""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_exponential_backoff_delays(self, mock_sleep, mock_tools):
+        """Test exponential backoff retry delays without waiting."""
         failing_tool = MockTool("flaky", should_fail=True)
         mock_tools.tools["flaky"] = failing_tool
         engine = ExecutionEngine(tools=mock_tools, max_retries=3)
@@ -258,15 +264,12 @@ class TestExecutionEngine:
             reasoning="Test exponential backoff",
         )
 
-        start_time = asyncio.get_event_loop().time()
         await engine.execute_step_with_retry(step)
-        end_time = asyncio.get_event_loop().time()
 
-        # Total delays: 1s + 2s = 3s (exponential backoff: 2^0, 2^1)
-        # Allow some tolerance for execution time
-        elapsed = end_time - start_time
-        assert elapsed >= 3.0  # At least 3 seconds
-        assert elapsed < 4.0  # But not much more
+        # Verify exponential backoff pattern: 2^0=1s, 2^1=2s
+        assert mock_sleep.call_count == 2  # 2 delays between 3 attempts
+        assert mock_sleep.call_args_list[0][0][0] == 1.0  # First delay: 1s
+        assert mock_sleep.call_args_list[1][0][0] == 2.0  # Second delay: 2s
         assert failing_tool.call_count == 3
 
     @pytest.mark.asyncio
@@ -351,8 +354,9 @@ class TestExecutionEngine:
         assert mock_tools.tools["todo_store"].call_count == 1
 
     @pytest.mark.asyncio
-    async def test_engine_with_different_max_retries(self, mock_tools):
-        """Test engine with custom max_retries."""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_engine_with_different_max_retries(self, mock_sleep, mock_tools):
+        """Test engine with custom max_retries without waiting."""
         failing_tool = MockTool("fail", should_fail=True)
         mock_tools.tools["fail"] = failing_tool
         engine = ExecutionEngine(tools=mock_tools, max_retries=5)
@@ -370,10 +374,12 @@ class TestExecutionEngine:
         assert failing_tool.call_count == 5
         assert result.error is not None
         assert "Failed after 5 attempts" in result.error
+        assert mock_sleep.call_count == 4  # 4 delays between 5 attempts
 
     @pytest.mark.asyncio
-    async def test_execute_plan_partial_completion(self, engine, mock_tools):
-        """Test that partial results are returned on failure."""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_execute_plan_partial_completion(self, mock_sleep, engine, mock_tools):
+        """Test that partial results are returned on failure without retry delays."""
         failing_tool = MockTool("fail", should_fail=True)
         mock_tools.tools["fail"] = failing_tool
 
@@ -411,3 +417,4 @@ class TestExecutionEngine:
         assert results[0].success is True
         assert results[1].success is True
         assert results[2].success is False
+        assert mock_sleep.call_count == 2  # 2 delays from failing step retries

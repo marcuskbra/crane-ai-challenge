@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from challenge.models.plan import Plan
+from challenge.models.run import ExecutionStep
+from challenge.orchestrator.execution_context import ExecutionContext
 from challenge.planner.llm_planner import LLMPlanner
 
 
@@ -52,7 +54,9 @@ async def test_llm_planner_multi_step(mock_openai):
     mock_response.choices = [
         MagicMock(
             message=MagicMock(
-                content='{"steps": [{"step_number": 1, "tool_name": "calculator", "tool_input": {"expression": "2+3"}, "reasoning": "Calculate sum"}, {"step_number": 2, "tool_name": "todo_store", "tool_input": {"action": "add", "text": "Buy milk"}, "reasoning": "Add todo item"}], "final_goal": "Calculate and add todo"}'
+                content='{"steps": ['
+                        '{"step_number": 1, "tool_name": "calculator", "tool_input": {"expression": "2+3"}, '
+                        '"reasoning": "Calculate sum"}, {"step_number": 2, "tool_name": "todo_store", "tool_input": {"action": "add", "text": "Buy milk"}, "reasoning": "Add todo item"}], "final_goal": "Calculate and add todo"}'
             )
         )
     ]
@@ -265,3 +269,187 @@ async def test_todo_operations(mock_openai):
     assert plan.steps[0].tool_name == "todo_store"
     assert plan.steps[0].tool_input["action"] == "add"
     assert plan.steps[0].tool_input["text"] == "Buy groceries"
+
+
+@pytest.mark.asyncio
+async def test_complex_multi_step_with_variable_resolution(mock_openai):
+    """Test complex multi-step plan with variable resolution across steps.
+
+    Tests the prompt: "Calculate (42 * 8) + 15, then use the result and multiply by 2,
+    and add the result as a todo"
+
+    This validates:
+    1. LLM can create a multi-step plan with variable references
+    2. Variables are properly referenced using {step_N_output} syntax
+    3. Plan structure correctly chains calculations with todo creation
+    """
+    # Mock LLM response with multi-step plan using variable references
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content="""{
+                    "steps": [
+                        {
+                            "step_number": 1,
+                            "tool_name": "calculator",
+                            "tool_input": {"expression": "(42 * 8) + 15"},
+                            "reasoning": "Calculate the initial expression (42 * 8) + 15 which equals 351"
+                        },
+                        {
+                            "step_number": 2,
+                            "tool_name": "calculator",
+                            "tool_input": {"expression": "{step_1_output} * 2"},
+                            "reasoning": "Multiply the result from step 1 by 2"
+                        },
+                        {
+                            "step_number": 3,
+                            "tool_name": "todo_store",
+                            "tool_input": {
+                                "action": "add",
+                                "text": "Result: {step_2_output}"
+                            },
+                            "reasoning": "Add the final calculation result as a todo"
+                        }
+                    ],
+                    "final_goal": "Calculate (42 * 8) + 15, multiply by 2, and add as todo"
+                }"""
+            )
+        )
+    ]
+    mock_response.usage = MagicMock(total_tokens=350)
+
+    mock_client = mock_openai.return_value
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    # Test planner
+    planner = LLMPlanner()
+    plan = await planner.create_plan(
+        "Calculate (42 * 8) + 15, then use the result and multiply by 2, and add the result as a todo"
+    )
+
+    # Assertions - Plan structure
+    assert isinstance(plan, Plan)
+    assert len(plan.steps) == 3, "Should have 3 steps: calc, calc, todo"
+
+    # Step 1: Initial calculation
+    assert plan.steps[0].step_number == 1
+    assert plan.steps[0].tool_name == "calculator"
+    assert plan.steps[0].tool_input["expression"] == "(42 * 8) + 15"
+    assert "initial expression" in plan.steps[0].reasoning.lower()
+
+    # Step 2: Multiply by 2 using variable reference
+    assert plan.steps[1].step_number == 2
+    assert plan.steps[1].tool_name == "calculator"
+    assert "{step_1_output}" in plan.steps[1].tool_input["expression"]
+    assert plan.steps[1].tool_input["expression"] == "{step_1_output} * 2"
+    assert "multiply" in plan.steps[1].reasoning.lower()
+
+    # Step 3: Add result as todo using variable reference
+    assert plan.steps[2].step_number == 3
+    assert plan.steps[2].tool_name == "todo_store"
+    assert plan.steps[2].tool_input["action"] == "add"
+    assert "{step_2_output}" in plan.steps[2].tool_input["text"]
+    assert "Result: {step_2_output}" == plan.steps[2].tool_input["text"]
+    assert "todo" in plan.steps[2].reasoning.lower()
+
+    # Verify token tracking
+    assert planner.last_token_count == 350
+
+
+@pytest.mark.asyncio
+async def test_complex_multi_step_execution_with_context(mock_openai):
+    """Test that complex multi-step plan executes correctly with ExecutionContext.
+
+    This is an integration test that validates variable resolution actually works
+    when the plan is executed by the orchestrator with ExecutionContext.
+    """
+    # Mock LLM response
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content="""{
+                    "steps": [
+                        {
+                            "step_number": 1,
+                            "tool_name": "calculator",
+                            "tool_input": {"expression": "(42 * 8) + 15"},
+                            "reasoning": "Calculate initial value"
+                        },
+                        {
+                            "step_number": 2,
+                            "tool_name": "calculator",
+                            "tool_input": {"expression": "{step_1_output} * 2"},
+                            "reasoning": "Multiply by 2"
+                        },
+                        {
+                            "step_number": 3,
+                            "tool_name": "todo_store",
+                            "tool_input": {
+                                "action": "add",
+                                "text": "Result: {step_2_output}"
+                            },
+                            "reasoning": "Add as todo"
+                        }
+                    ],
+                    "final_goal": "Multi-step calculation with todo"
+                }"""
+            )
+        )
+    ]
+    mock_response.usage = MagicMock(total_tokens=300)
+
+    mock_client = mock_openai.return_value
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    # Create plan
+    planner = LLMPlanner()
+    plan = await planner.create_plan("Calculate (42 * 8) + 15, multiply by 2, add as todo")
+
+    # Simulate execution with ExecutionContext
+    context = ExecutionContext()
+
+    # Step 1: Calculate (42 * 8) + 15 = 351
+    step1_result = 351
+    step1_execution = ExecutionStep(
+        step_number=1,
+        tool_name="calculator",
+        tool_input={"expression": "(42 * 8) + 15"},
+        success=True,
+        output=step1_result,
+        attempts=1,
+    )
+    context.record_step(step1_execution)
+
+    # Verify step 1 result is stored
+    assert context.variables["step_1_output"] == 351
+
+    # Step 2: Resolve variables and execute
+    step2_input = context.resolve_variables(plan.steps[1].tool_input)
+    assert step2_input["expression"] == "351 * 2", "Variable should be resolved to 351"
+
+    # Calculate step 2: 351 * 2 = 702
+    step2_result = 702
+    step2_execution = ExecutionStep(
+        step_number=2,
+        tool_name="calculator",
+        tool_input=step2_input,
+        success=True,
+        output=step2_result,
+        attempts=1,
+    )
+    context.record_step(step2_execution)
+
+    # Verify step 2 result is stored
+    assert context.variables["step_2_output"] == 702
+
+    # Step 3: Resolve variables for todo
+    step3_input = context.resolve_variables(plan.steps[2].tool_input)
+    assert step3_input["action"] == "add"
+    assert step3_input["text"] == "Result: 702", "Variable should be resolved to 702"
+
+    # Verify the complete workflow
+    assert len(context.get_execution_log()) == 2
+    assert context.variables["step_1_output"] == 351
+    assert context.variables["step_2_output"] == 702

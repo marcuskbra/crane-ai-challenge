@@ -94,14 +94,14 @@ EXAMPLE_TODO_WORKFLOW = FewShotExample(
     complexity="moderate",
 )
 
-# Example 3: Multi-step with calculation + todo
+# Example 3: Multi-step with calculation + todo using variable resolution
 EXAMPLE_CALCULATION_THEN_TODO = FewShotExample(
     prompt="calculate 3 * 4 and add the result as a todo",
     reasoning="""
-    This requires coordinating two different tools:
-    1. First, calculate 3 * 4 using calculator (result: 12)
-    2. Then, add a todo with the calculation result
-    The todo text should describe what was calculated.
+    This requires coordinating two different tools with variable resolution:
+    1. First, calculate 3 * 4 using calculator
+    2. Then, add a todo with the calculation result using {step_1_output}
+    CRITICAL: Use {step_1_output} to reference the calculator result, not hardcoded values.
     """,
     plan=Plan(
         steps=[
@@ -114,8 +114,8 @@ EXAMPLE_CALCULATION_THEN_TODO = FewShotExample(
             PlanStep(
                 step_number=2,
                 tool_name="todo_store",
-                tool_input={"action": "add", "text": "Result of 3 * 4 = 12"},
-                reasoning="Store calculation result as a todo item for reference",
+                tool_input={"action": "add", "text": "Result: {step_1_output}"},
+                reasoning="Store calculation result as todo using {step_1_output} variable",
             ),
         ],
         final_goal="Calculate 3 * 4 and store result as todo",
@@ -182,6 +182,100 @@ EXAMPLE_SIMPLE_LIST = FewShotExample(
     complexity="simple",
 )
 
+# Example 6: Variable resolution - complete first todo
+EXAMPLE_COMPLETE_FIRST_TODO = FewShotExample(
+    prompt="List all my todos and mark the first one as complete",
+    reasoning="""
+    This requires variable resolution between steps:
+    1. First, list all todos to get the todo IDs
+    2. Then, complete the first todo using {first_todo_id} variable
+    The {first_todo_id} variable will be automatically extracted from step 1's output.
+    """,
+    plan=Plan(
+        steps=[
+            PlanStep(
+                step_number=1,
+                tool_name="todo_store",
+                tool_input={"action": "list"},
+                reasoning="List all todos to get their IDs",
+            ),
+            PlanStep(
+                step_number=2,
+                tool_name="todo_store",
+                tool_input={"action": "complete", "todo_id": "{first_todo_id}"},
+                reasoning="Complete the first todo using ID from step 1",
+            ),
+        ],
+        final_goal="List todos and complete the first one",
+    ),
+    complexity="complex",
+)
+
+# Example 7: Variable resolution - delete last todo
+EXAMPLE_DELETE_LAST_TODO = FewShotExample(
+    prompt="Show me my tasks and delete the last one",
+    reasoning="""
+    This requires variable resolution for the last item:
+    1. First, list all todos to get the todo IDs
+    2. Then, delete the last todo using {last_todo_id} variable
+    The {last_todo_id} variable will be automatically extracted from step 1's output.
+    """,
+    plan=Plan(
+        steps=[
+            PlanStep(
+                step_number=1,
+                tool_name="todo_store",
+                tool_input={"action": "list"},
+                reasoning="List all todos to get their IDs",
+            ),
+            PlanStep(
+                step_number=2,
+                tool_name="todo_store",
+                tool_input={"action": "delete", "todo_id": "{last_todo_id}"},
+                reasoning="Delete the last todo using ID from step 1",
+            ),
+        ],
+        final_goal="Display todos and delete the last one",
+    ),
+    complexity="complex",
+)
+
+# Example 8: Chained calculator operations with variable resolution
+EXAMPLE_CHAINED_CALCULATIONS = FewShotExample(
+    prompt="Calculate 10 + 5, then multiply the result by 2, and add it as a todo",
+    reasoning="""
+    This requires chaining calculator operations with variable resolution:
+    1. First, calculate 10 + 5 using calculator
+    2. Then, multiply the result by 2 using {step_1_output}
+    3. Finally, add the final result as a todo using {step_2_output}
+    CRITICAL: Each step references the previous step's output using {step_N_output} syntax.
+    """,
+    plan=Plan(
+        steps=[
+            PlanStep(
+                step_number=1,
+                tool_name="calculator",
+                tool_input={"expression": "10 + 5"},
+                reasoning="Calculate initial value 10 + 5",
+            ),
+            PlanStep(
+                step_number=2,
+                tool_name="calculator",
+                tool_input={"expression": "{step_1_output} * 2"},
+                reasoning="Multiply result from step 1 by 2 using {step_1_output}",
+            ),
+            PlanStep(
+                step_number=3,
+                tool_name="todo_store",
+                tool_input={"action": "add", "text": "Calculation result: {step_2_output}"},
+                reasoning="Store final result as todo using {step_2_output} variable",
+            ),
+        ],
+        final_goal="Perform chained calculations and store final result as todo",
+    ),
+    complexity="complex",
+)
+
 
 # Collection of all examples for easy access
 ALL_EXAMPLES: list[FewShotExample] = [
@@ -190,6 +284,9 @@ ALL_EXAMPLES: list[FewShotExample] = [
     EXAMPLE_CALCULATION_THEN_TODO,
     EXAMPLE_MULTI_TODO_OPERATIONS,
     EXAMPLE_SIMPLE_LIST,
+    EXAMPLE_COMPLETE_FIRST_TODO,
+    EXAMPLE_DELETE_LAST_TODO,
+    EXAMPLE_CHAINED_CALCULATIONS,
 ]
 
 

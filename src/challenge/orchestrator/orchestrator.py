@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timezone
 
 from challenge.models.run import Run, RunStatus
+from challenge.orchestrator.execution_context import ExecutionContext
 from challenge.orchestrator.execution_engine import ExecutionEngine
 from challenge.orchestrator.metrics_tracker import MetricsTracker
 from challenge.orchestrator.run_manager import RunManager
@@ -186,8 +187,13 @@ class Orchestrator:
             run.started_at = datetime.now(timezone.utc)
             logger.info(f"Starting execution for run {run_id}")
 
+            # Create execution context for variable resolution across steps
+            context = ExecutionContext()
+
             # Execute plan with execution engine
-            run.execution_log = await self.engine.execute_plan(run.plan.steps, step_timeout=self.step_timeout)
+            run.execution_log = await self.engine.execute_plan(
+                run.plan.steps, step_timeout=self.step_timeout, context=context
+            )
 
             # Check if all steps succeeded
             if run.execution_log and all(step.success for step in run.execution_log):
