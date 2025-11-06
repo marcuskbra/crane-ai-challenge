@@ -117,6 +117,43 @@ make run
 # API Documentation: http://localhost:8000/api/docs
 ```
 
+### Frontend Dashboard (Visualization Tool)
+
+**Note:** A React-based UI dashboard is included to help visualize the agent runtime execution flow. This was created as a **visualization aid** for development and demonstration purposes - it is **not intended as a production-ready frontend** and was not part of the core assignment requirements.
+
+**Setup:**
+
+```bash
+# Navigate to frontend directory
+cd ui-react
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Frontend available at http://localhost:3000
+```
+
+**Or using Makefile:**
+
+```bash
+make ui-install  # Install frontend dependencies
+make ui-dev      # Start frontend dev server
+```
+
+**Features:**
+- Real-time execution monitoring with WebSocket-like polling
+- Step-by-step execution timeline visualization
+- Custom renderers for TodoStore and Calculator outputs
+- System metrics dashboard
+- Optimistic UI for instant feedback
+
+**Screenshots:**
+
+[TODO: Add screenshots here]
+
 ### Configuration
 
 The application can be configured using environment variables or by creating a `.env` file:

@@ -3,6 +3,7 @@
 
 .PHONY: help install dev-install test lint lint-fix format format-fix type-check coverage validate clean run \
 	test-all test-unit test-integration test-fast api-dev api-prod api-test api-docs api-health \
+	ui-install ui-dev ui-build ui-clean ui-lint ui-test \
 	llm-docker-up llm-docker-down llm-docker-logs llm-docker-test llm-docker-clean \
 	llm-local-setup llm-local-pull llm-local-pull-fast llm-local-start llm-local-stop llm-local-test \
 	llm-check llm-status llm-models
@@ -23,8 +24,11 @@ help: ## Show this help message
 	@echo "API Development:"
 	@grep -E '^(api-.*):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 	@echo ""
+	@echo "Frontend UI (Visualization):"
+	@grep -E '^(ui-.*):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
+	@echo ""
 	@echo "Testing:"
-	@grep -E '^(test[^-]|test-all|test-unit|test-integration|test-fast|coverage):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(test[^-]|test-all|test-integration|test-fast|coverage):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Local LLM Testing:"
 	@grep -E '^(llm-.*):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
@@ -73,6 +77,39 @@ api-health: ## Check API health endpoint
 api-docs: ## Open API documentation in browser
 	@echo "Opening API docs at http://localhost:8000/api/docs"
 	@python -m webbrowser http://localhost:8000/api/docs || open http://localhost:8000/api/docs || xdg-open http://localhost:8000/api/docs
+
+# ============================================================================
+# Frontend UI (Visualization Tool)
+# ============================================================================
+
+ui-install: ## Install frontend dependencies
+	@echo "📦 Installing frontend dependencies..."
+	cd ui-react && npm install
+	@echo "✅ Frontend dependencies installed!"
+
+ui-dev: ## Run frontend development server
+	@echo "🚀 Starting frontend development server..."
+	@echo "📝 Note: This is a visualization tool, not production-ready"
+	@echo "🌐 Frontend will be available at http://localhost:3000"
+	cd ui-react && npm run dev
+
+ui-build: ## Build frontend for production (visualization only)
+	@echo "🏗️  Building frontend..."
+	cd ui-react && npm run build
+	@echo "✅ Frontend build complete (dist/)"
+
+ui-clean: ## Clean frontend build artifacts and dependencies
+	@echo "🧹 Cleaning frontend files..."
+	cd ui-react && rm -rf node_modules dist .vite
+	@echo "✅ Frontend cleanup complete!"
+
+ui-lint: ## Run frontend linting
+	@echo "🔍 Linting frontend code..."
+	cd ui-react && npm run lint || echo "⚠️  Linting issues found"
+
+ui-test: ## Run frontend tests (if available)
+	@echo "🧪 Running frontend tests..."
+	@echo "⚠️  Frontend tests not implemented (visualization tool only)"
 
 # ============================================================================
 # Testing
