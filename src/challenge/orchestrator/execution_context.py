@@ -10,7 +10,11 @@ import re
 from typing import Any, TypeAlias
 
 from challenge.models.run import ExecutionStep
-from challenge.orchestrator.type_guards import is_pydantic_model
+from challenge.orchestrator.type_guards import (
+    is_calculator_output,
+    is_todo_list_output,
+    is_todo_single_output,
+)
 from challenge.tools.types import ToolInput, ToolOutput
 
 logger = logging.getLogger(__name__)
@@ -89,30 +93,31 @@ class ExecutionContext:
         # Always provide step_N_output reference
         self.variables[f"step_{step_number}_output"] = output
 
-        # Handle Pydantic model outputs (TodoListOutput, TodoAddOutput, etc.)
-        if is_pydantic_model(output):
-            # TodoListOutput case: extract from .todos list
-            if hasattr(output, "todos") and isinstance(output.todos, list) and output.todos:
-                todos_list = output.todos
-                self.variables[f"step_{step_number}_count"] = len(todos_list)
+        # Type-safe handling using TypeGuards (per TYPING_GUIDE.md lines 127-134)
+        if is_todo_list_output(output):
+            # Type checker knows output is TodoListOutput with .todos, .total_count
+            self.variables[f"step_{step_number}_count"] = output.total_count
 
-                # Extract first/last todo IDs
-                if hasattr(todos_list[0], "id"):
-                    self.variables["first_todo_id"] = todos_list[0].id
-                    self.variables[f"step_{step_number}_first_id"] = todos_list[0].id
+            # Extract first/last todo IDs
+            if output.todos:
+                first_todo = output.todos[0]
+                self.variables["first_todo_id"] = first_todo.id
+                self.variables[f"step_{step_number}_first_id"] = first_todo.id
 
-                    if len(todos_list) > 1:
-                        self.variables["last_todo_id"] = todos_list[-1].id
-                        self.variables[f"step_{step_number}_last_id"] = todos_list[-1].id
+                if len(output.todos) > 1:
+                    last_todo = output.todos[-1]
+                    self.variables["last_todo_id"] = last_todo.id
+                    self.variables[f"step_{step_number}_last_id"] = last_todo.id
 
-            # TodoAddOutput, TodoGetOutput, TodoCompleteOutput, TodoDeleteOutput: extract from .todo
-            elif hasattr(output, "todo") and hasattr(output.todo, "id"):
-                self.variables["last_todo_id"] = output.todo.id
-                self.variables[f"step_{step_number}_id"] = output.todo.id
+        elif is_todo_single_output(output):
+            # Type checker knows output has .todo attribute (TodoAddOutput, etc.)
+            self.variables["last_todo_id"] = output.todo.id
+            self.variables[f"step_{step_number}_id"] = output.todo.id
 
-            # CalculatorOutput case: extract from .result
-            elif hasattr(output, "result"):
-                self.variables[f"step_{step_number}_result"] = output.result
+        elif is_calculator_output(output):
+            # Type checker knows output is CalculatorOutput with .result
+            self.variables[f"step_{step_number}_result"] = output.result
+
         # Extract from scalar outputs (float, int, str returned directly by tools)
         elif isinstance(output, (int, float, str)):
             self.variables[f"step_{step_number}_value"] = output

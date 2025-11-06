@@ -13,7 +13,16 @@ from typing import Any, TypeGuard
 
 from pydantic import BaseModel
 
-from challenge.tools.types import ToolInput
+from challenge.tools.types import (
+    CalculatorOutput,
+    TodoAddOutput,
+    TodoCompleteOutput,
+    TodoDeleteOutput,
+    TodoGetOutput,
+    TodoListOutput,
+    ToolInput,
+    ToolOutput,
+)
 
 
 def is_tool_input_model(obj: Any) -> TypeGuard[ToolInput]:
@@ -48,3 +57,49 @@ def is_pydantic_model(obj: Any) -> TypeGuard[BaseModel]:
 
     """
     return isinstance(obj, BaseModel)
+
+
+def is_todo_list_output(output: ToolOutput) -> TypeGuard[TodoListOutput]:
+    """
+    Type guard for TodoListOutput.
+
+    Args:
+        output: Tool output to check
+
+    Returns:
+        True if output is TodoListOutput, False otherwise
+
+    """
+    return isinstance(output, TodoListOutput)
+
+
+def is_todo_single_output(
+    output: ToolOutput,
+) -> TypeGuard[TodoAddOutput | TodoGetOutput | TodoCompleteOutput | TodoDeleteOutput]:
+    """
+    Type guard for single todo outputs.
+
+    Matches TodoAddOutput, TodoGetOutput, TodoCompleteOutput, or TodoDeleteOutput.
+
+    Args:
+        output: Tool output to check
+
+    Returns:
+        True if output is any single todo output type, False otherwise
+
+    """
+    return isinstance(output, (TodoAddOutput, TodoGetOutput, TodoCompleteOutput, TodoDeleteOutput))
+
+
+def is_calculator_output(output: ToolOutput) -> TypeGuard[CalculatorOutput]:
+    """
+    Type guard for CalculatorOutput.
+
+    Args:
+        output: Tool output to check
+
+    Returns:
+        True if output is CalculatorOutput, False otherwise
+
+    """
+    return isinstance(output, CalculatorOutput)
