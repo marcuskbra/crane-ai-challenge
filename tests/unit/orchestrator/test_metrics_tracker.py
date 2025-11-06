@@ -6,7 +6,7 @@ Tests metrics collection for planner performance tracking.
 
 import pytest
 
-from challenge.planner.metrics_tracker import MetricsTracker
+from challenge.planner.metrics_tracker import MetricsTracker, PlannerStats
 
 
 class TestMetricsTracker:
@@ -158,8 +158,6 @@ class TestMetricsTracker:
 
     def test_get_stats_returns_model(self, tracker):
         """Test get_stats() returns PlannerStats model with expected fields."""
-        from challenge.planner.metrics_tracker import PlannerStats
-
         stats = tracker.get_stats()
 
         assert isinstance(stats, PlannerStats)

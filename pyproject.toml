@@ -223,6 +223,7 @@ markers = [
     "slow: Slow tests (taking more than 1 second)",
     "smoke: Smoke tests (basic sanity checks)",
     "golden: Golden dataset evaluation tests (systematic quality measurement)",
+    "timeout: Tests with timeout limits to prevent hangs (e.g., ReDoS security tests)",
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
