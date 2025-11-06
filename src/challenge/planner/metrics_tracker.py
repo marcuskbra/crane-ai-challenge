@@ -7,7 +7,30 @@ tracking LLM vs pattern-based planning, token usage, and latency.
 
 import logging
 
+from pydantic import BaseModel, ConfigDict, Field
+
 logger = logging.getLogger(__name__)
+
+
+class PlannerStats(BaseModel):
+    """
+    Planner performance statistics model.
+
+    Provides type-safe access to planner metrics including plan counts,
+    token usage, and latency measurements.
+    """
+
+    total_plans: int = Field(..., description="Total number of plans created")
+    llm_plans: int = Field(..., description="Plans generated using LLM")
+    pattern_plans: int = Field(..., description="Plans generated using patterns")
+    total_tokens: int = Field(..., description="Total tokens consumed by LLM")
+    total_latency_ms: float = Field(..., description="Cumulative planning latency in milliseconds")
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        strict=True,
+        extra="forbid",
+    )
 
 
 class MetricsTracker:
@@ -53,12 +76,12 @@ class MetricsTracker:
             self.pattern_plans += 1
             logger.debug(f"Pattern plan generated: {latency_ms:.1f}ms")
 
-    def get_stats(self) -> dict[str, int | float]:
+    def get_stats(self) -> PlannerStats:
         """
         Get current metrics snapshot.
 
         Returns:
-            Dictionary with metrics:
+            PlannerStats model with metrics:
                 - total_plans: Total number of plans created
                 - llm_plans: Plans generated using LLM
                 - pattern_plans: Plans generated using patterns
@@ -66,13 +89,13 @@ class MetricsTracker:
                 - total_latency_ms: Cumulative planning latency
 
         """
-        return {
-            "total_plans": self.total_plans,
-            "llm_plans": self.llm_plans,
-            "pattern_plans": self.pattern_plans,
-            "total_tokens": self.total_tokens,
-            "total_latency_ms": self.total_latency_ms,
-        }
+        return PlannerStats(
+            total_plans=self.total_plans,
+            llm_plans=self.llm_plans,
+            pattern_plans=self.pattern_plans,
+            total_tokens=self.total_tokens,
+            total_latency_ms=self.total_latency_ms,
+        )
 
     def reset(self) -> None:
         """

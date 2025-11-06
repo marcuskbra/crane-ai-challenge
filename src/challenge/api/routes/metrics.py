@@ -88,9 +88,9 @@ async def get_metrics(
     )
 
     # Calculate planner metrics from orchestrator stats
-    stats: dict[str, int | float] = orchestrator.metrics.get_stats()
-    llm_plans: int = int(stats.get("llm_plans", 0))
-    pattern_plans = int(stats.get("pattern_plans", 0))
+    stats = orchestrator.metrics.get_stats()
+    llm_plans: int = stats.llm_plans
+    pattern_plans: int = stats.pattern_plans
     total_plans: int = llm_plans + pattern_plans
 
     planner_metrics = PlannerMetrics(
@@ -98,8 +98,8 @@ async def get_metrics(
         llm_plans=llm_plans,
         pattern_plans=pattern_plans,
         fallback_rate=round(pattern_plans / total_plans, 3) if total_plans > 0 else 0.0,
-        avg_tokens_per_plan=round(stats["total_tokens"] / llm_plans, 1) if llm_plans > 0 else 0.0,
-        avg_latency_ms=round(stats["total_latency_ms"] / total_plans, 1) if total_plans > 0 else 0.0,
+        avg_tokens_per_plan=round(stats.total_tokens / llm_plans, 1) if llm_plans > 0 else 0.0,
+        avg_latency_ms=round(stats.total_latency_ms / total_plans, 1) if total_plans > 0 else 0.0,
     )
 
     # Build typed response
