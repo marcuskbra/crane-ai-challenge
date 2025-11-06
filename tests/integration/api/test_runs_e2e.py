@@ -7,7 +7,6 @@ Tests the complete flow: API → Orchestrator → Planner → Tools
 import asyncio
 
 import pytest
-from starlette.status import HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class TestRunsE2E:
@@ -188,7 +187,7 @@ class TestRunsE2E:
         )
 
         # Should fail validation
-        assert response.status_code == HTTP_422_UNPROCESSABLE_CONTENT
+        assert response.status_code == 422
 
     def test_get_nonexistent_run(self, test_client):
         """Test 404 for nonexistent run."""

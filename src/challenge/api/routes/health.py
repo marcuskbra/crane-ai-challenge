@@ -19,10 +19,9 @@ import logging
 import platform
 import sys
 from datetime import datetime, timezone
-from typing import Any
 
 from fastapi import APIRouter, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from challenge.api.dependencies import SettingsDep
 from challenge.core.exceptions import ServiceUnavailableError
@@ -30,6 +29,20 @@ from challenge.core.exceptions import ServiceUnavailableError
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+class SystemInfo(BaseModel):
+    """System information model for health checks."""
+
+    python_version: str = Field(..., description="Python runtime version")
+    platform: str = Field(..., description="Operating system platform")
+    architecture: str = Field(..., description="CPU architecture")
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        strict=True,
+        extra="forbid",
+    )
 
 
 class HealthResponse(BaseModel):
@@ -59,7 +72,7 @@ class HealthResponse(BaseModel):
 class DetailedHealthResponse(HealthResponse):
     """Detailed health check response with system information."""
 
-    system: dict[str, Any] = Field(
+    system: SystemInfo = Field(
         ...,
         description="System information",
     )
@@ -135,11 +148,11 @@ async def health_check(settings: SettingsDep) -> DetailedHealthResponse:
         version=settings.app_version,
         timestamp=datetime.now(timezone.utc),
         environment=settings.environment,
-        system={
-            "python_version": sys.version,
-            "platform": platform.platform(),
-            "architecture": platform.machine(),
-        },
+        system=SystemInfo(
+            python_version=sys.version,
+            platform=platform.platform(),
+            architecture=platform.machine(),
+        ),
         checks=checks,
     )
 

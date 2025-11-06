@@ -158,7 +158,19 @@ class LLMPlanner:
             System prompt string
 
         """
-        base_prompt = """You are a task planning agent. Convert user requests into structured execution plans.
+        base_prompt = """
+You are an expert task decomposition specialist!
+
+Before generating the plan:
+1. Identify the user's primary goal
+2. Break down into atomic, sequential steps
+3. Verify each step uses only available tools
+4. Ensure steps are properly ordered
+
+If ambiguous:
+- Prefer simpler interpretations
+- Use calculator for any numeric operations
+- Break complex todos into multiple steps
 
 Available Tools:
 1. calculator
