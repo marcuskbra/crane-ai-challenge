@@ -165,7 +165,7 @@ class TestExecutionEngine:
             PlanStep(
                 step_number=2,
                 tool_name="todo_store",
-                tool_input={"task": "test"},
+                tool_input={"action": "add", "text": "test"},
                 reasoning="Store todo task",
             ),
             PlanStep(
@@ -293,7 +293,7 @@ class TestExecutionEngine:
 
         assert result.step_number == 5
         assert result.tool_name == "calculator"
-        assert result.tool_input == {"expression": "10 + 20"}
+        assert result.tool_input.model_dump() == {"expression": "10 + 20"}
 
     @pytest.mark.asyncio
     async def test_tool_returns_failure_result(self, mock_tools):

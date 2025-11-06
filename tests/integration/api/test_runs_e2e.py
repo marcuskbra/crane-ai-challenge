@@ -66,8 +66,8 @@ class TestRunsE2E:
 
         data = response.json()
         assert data["status"] == "completed"
-        assert data["result"]["text"] == "write tests"  # Planner converts to lowercase
-        assert data["result"]["completed"] is False
+        assert data["result"]["todo"]["text"] == "write tests"  # Planner converts to lowercase
+        assert data["result"]["todo"]["completed"] is False
 
         # Create run to list todos
         response = test_client.post(
@@ -87,10 +87,10 @@ class TestRunsE2E:
 
         data = response.json()
         assert data["status"] == "completed"
-        assert isinstance(data["result"], list)
-        assert len(data["result"]) >= 1
+        assert isinstance(data["result"]["todos"], list)
+        assert len(data["result"]["todos"]) >= 1
         # Find our todo (case-insensitive since planner lowercases)
-        assert any(t["text"] == "write tests" for t in data["result"])
+        assert any(t["text"] == "write tests" for t in data["result"]["todos"])
 
     @pytest.mark.asyncio
     async def test_multi_step_run(self, test_client):

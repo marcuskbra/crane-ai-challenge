@@ -35,6 +35,11 @@ class CustomSyncPlanner:
             final_goal=prompt,
         )
 
+    @property
+    def last_token_count(self) -> int | None:
+        """Custom planner doesn't track tokens."""
+        return None
+
 
 class CustomAsyncPlanner:
     """Custom async planner without inheritance."""
@@ -52,6 +57,11 @@ class CustomAsyncPlanner:
             ],
             final_goal=prompt,
         )
+
+    @property
+    def last_token_count(self) -> int | None:
+        """Custom async planner doesn't track tokens."""
+        return None
 
 
 def test_pattern_based_planner_conforms_to_protocol():
@@ -100,7 +110,7 @@ async def test_orchestrator_handles_sync_planner():
 
     assert run.plan is not None
     assert len(run.plan.steps) == 1
-    assert run.plan.steps[0].tool_input["expression"] == "1+1"
+    assert run.plan.steps[0].tool_input.expression == "1+1"
 
 
 @pytest.mark.asyncio
@@ -113,7 +123,7 @@ async def test_orchestrator_handles_async_planner():
 
     assert run.plan is not None
     assert len(run.plan.steps) == 1
-    assert run.plan.steps[0].tool_input["expression"] == "2+2"
+    assert run.plan.steps[0].tool_input.expression == "2+2"
 
 
 @pytest.mark.asyncio
@@ -127,7 +137,7 @@ async def test_orchestrator_with_pattern_based_planner():
     assert run.plan is not None
     assert len(run.plan.steps) == 1
     assert run.plan.steps[0].tool_name == "calculator"
-    assert "5 + 3" in run.plan.steps[0].tool_input["expression"]
+    assert "5 + 3" in run.plan.steps[0].tool_input.expression
 
 
 def test_protocol_documentation():
@@ -154,6 +164,11 @@ def test_protocol_enables_duck_typing():
 
         def create_plan(self, prompt: str) -> Plan:
             return Plan(steps=[], final_goal=prompt)
+
+        @property
+        def last_token_count(self) -> int | None:
+            """Minimal planner doesn't track tokens."""
+            return None
 
     # This works! No inheritance, no registration, just matching signature
     orchestrator = Orchestrator(planner=MinimalPlanner())

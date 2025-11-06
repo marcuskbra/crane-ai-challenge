@@ -14,6 +14,7 @@ from challenge.models.plan import PlanStep
 from challenge.orchestrator.execution_context import ExecutionContext
 from challenge.orchestrator.execution_engine import ExecutionEngine
 from challenge.tools.registry import get_tool_registry
+from challenge.tools.types import TodoCompleteInput, TodoItem, TodoListOutput
 
 
 @pytest.fixture(autouse=True)
@@ -38,19 +39,25 @@ class TestExecutionContextVariableResolution:
     """Test ExecutionContext variable extraction and resolution."""
 
     def test_first_todo_id_extraction(self):
-        """Test that first_todo_id is extracted from list output."""
+        """Test that first_todo_id is extracted from TodoListOutput."""
         context = ExecutionContext()
 
         # Simulate step 1: list todos
+        todos_output = TodoListOutput(
+            todos=[
+                TodoItem(id="todo-abc-123", text="Buy milk", completed=False, created_at="2024-01-01T00:00:00Z"),
+                TodoItem(id="todo-def-456", text="Pay bills", completed=False, created_at="2024-01-01T00:00:00Z"),
+            ],
+            total_count=2,
+            completed_count=0,
+            pending_count=2,
+        )
         step1 = ExecutionStep(
             step_number=1,
             tool_name="todo_store",
             tool_input={"action": "list"},
             success=True,
-            output=[
-                {"id": "todo-abc-123", "text": "Buy milk", "completed": False},
-                {"id": "todo-def-456", "text": "Pay bills", "completed": False},
-            ],
+            output=todos_output,
             attempts=1,
         )
         context.record_step(step1)
@@ -67,7 +74,7 @@ class TestExecutionContextVariableResolution:
         context.variables["first_todo_id"] = "todo-abc-123"
 
         # Tool input with variable reference
-        tool_input = {"action": "complete", "todo_id": "{first_todo_id}"}
+        tool_input = TodoCompleteInput(action="complete", todo_id="{first_todo_id}")
 
         # Resolve variables
         resolved = context.resolve_variables(tool_input)
@@ -79,7 +86,7 @@ class TestExecutionContextVariableResolution:
         """Test error handling for undefined variables."""
         context = ExecutionContext()
 
-        tool_input = {"action": "complete", "todo_id": "{undefined_variable}"}
+        tool_input = TodoCompleteInput(action="complete", todo_id="{undefined_variable}")
 
         with pytest.raises(ValueError, match="Variable 'undefined_variable' not found"):
             context.resolve_variables(tool_input)
@@ -127,9 +134,9 @@ class TestMultiStepExecution:
 
         # Verify first todo was completed
         list_result = await todo_tool.execute(action="list")
-        todos = list_result.output
-        assert todos[0]["completed"] is True
-        assert todos[1]["completed"] is False
+        todos = list_result.output.todos  # TodoListOutput has .todos attribute
+        assert todos[0].completed is True
+        assert todos[1].completed is False
 
     @pytest.mark.asyncio
     async def test_list_and_delete_last_todo(self):
@@ -171,10 +178,10 @@ class TestMultiStepExecution:
 
         # Verify last todo was deleted (should have 2 left)
         list_result = await todo_tool.execute(action="list")
-        todos = list_result.output
+        todos = list_result.output.todos  # TodoListOutput has .todos attribute
         assert len(todos) == 2
-        assert todos[0]["text"] == "Buy milk"
-        assert todos[1]["text"] == "Pay bills"
+        assert todos[0].text == "Buy milk"
+        assert todos[1].text == "Pay bills"
 
     @pytest.mark.asyncio
     async def test_variable_resolution_failure_stops_execution(self):

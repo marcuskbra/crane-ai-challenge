@@ -8,6 +8,19 @@ import pytest
 
 from challenge.models.run import ExecutionStep
 from challenge.orchestrator.execution_context import ExecutionContext
+from challenge.tools.types import (
+    CalculatorInput,
+    CalculatorOutput,
+    TodoAddInput,
+    TodoAddOutput,
+    TodoCompleteInput,
+    TodoCompleteOutput,
+    TodoGetInput,
+    TodoGetOutput,
+    TodoItem,
+    TodoListInput,
+    TodoListOutput,
+)
 
 
 class TestExecutionContext:
@@ -63,12 +76,17 @@ class TestVariableExtractionFromList:
     """Test automatic variable extraction from list outputs."""
 
     def test_extract_first_todo_id(self):
-        """Test extraction of first_todo_id from list output (fixes original error)."""
+        """Test extraction of first_todo_id from TodoListOutput (fixes original error)."""
         context = ExecutionContext()
-        todos = [
-            {"id": "abc-123", "text": "Buy milk"},
-            {"id": "def-456", "text": "Walk dog"},
-        ]
+        todos = TodoListOutput(
+            todos=[
+                TodoItem(id="abc-123", text="Buy milk", completed=False, created_at="2024-01-01T00:00:00Z"),
+                TodoItem(id="def-456", text="Walk dog", completed=False, created_at="2024-01-01T00:00:00Z"),
+            ],
+            total_count=2,
+            completed_count=0,
+            pending_count=2,
+        )
         step = ExecutionStep(
             step_number=1,
             tool_name="todo_store",
@@ -85,13 +103,18 @@ class TestVariableExtractionFromList:
         assert context.variables["step_1_first_id"] == "abc-123"
 
     def test_extract_last_todo_id(self):
-        """Test extraction of last_todo_id from list output."""
+        """Test extraction of last_todo_id from TodoListOutput."""
         context = ExecutionContext()
-        todos = [
-            {"id": "abc-123", "text": "Buy milk"},
-            {"id": "def-456", "text": "Walk dog"},
-            {"id": "ghi-789", "text": "Clean room"},
-        ]
+        todos = TodoListOutput(
+            todos=[
+                TodoItem(id="abc-123", text="Buy milk", completed=False, created_at="2024-01-01T00:00:00Z"),
+                TodoItem(id="def-456", text="Walk dog", completed=False, created_at="2024-01-01T00:00:00Z"),
+                TodoItem(id="ghi-789", text="Clean room", completed=False, created_at="2024-01-01T00:00:00Z"),
+            ],
+            total_count=3,
+            completed_count=0,
+            pending_count=3,
+        )
         step = ExecutionStep(
             step_number=1,
             tool_name="todo_store",
@@ -107,9 +130,14 @@ class TestVariableExtractionFromList:
         assert context.variables["step_1_last_id"] == "ghi-789"
 
     def test_extract_single_todo_id(self):
-        """Test extraction from single-item list."""
+        """Test extraction from single-item TodoListOutput."""
         context = ExecutionContext()
-        todos = [{"id": "abc-123", "text": "Only task"}]
+        todos = TodoListOutput(
+            todos=[TodoItem(id="abc-123", text="Only task", completed=False, created_at="2024-01-01T00:00:00Z")],
+            total_count=1,
+            completed_count=0,
+            pending_count=1,
+        )
         step = ExecutionStep(
             step_number=1,
             tool_name="todo_store",
@@ -126,13 +154,18 @@ class TestVariableExtractionFromList:
         assert "last_todo_id" not in context.variables
 
     def test_extract_list_count(self):
-        """Test extraction of item count from list."""
+        """Test extraction of item count from TodoListOutput."""
         context = ExecutionContext()
-        todos = [
-            {"id": "1", "text": "Task 1"},
-            {"id": "2", "text": "Task 2"},
-            {"id": "3", "text": "Task 3"},
-        ]
+        todos = TodoListOutput(
+            todos=[
+                TodoItem(id="1", text="Task 1", completed=False, created_at="2024-01-01T00:00:00Z"),
+                TodoItem(id="2", text="Task 2", completed=False, created_at="2024-01-01T00:00:00Z"),
+                TodoItem(id="3", text="Task 3", completed=False, created_at="2024-01-01T00:00:00Z"),
+            ],
+            total_count=3,
+            completed_count=0,
+            pending_count=3,
+        )
         step = ExecutionStep(
             step_number=1,
             tool_name="todo_store",
@@ -147,14 +180,15 @@ class TestVariableExtractionFromList:
         assert context.variables["step_1_count"] == 3
 
     def test_extract_from_empty_list(self):
-        """Test handling of empty list output."""
+        """Test handling of empty TodoListOutput."""
         context = ExecutionContext()
+        todos = TodoListOutput(todos=[], total_count=0, completed_count=0, pending_count=0)
         step = ExecutionStep(
             step_number=1,
             tool_name="todo_store",
             tool_input={"action": "list"},
             success=True,
-            output=[],
+            output=todos,
             attempts=1,
         )
 
@@ -163,23 +197,25 @@ class TestVariableExtractionFromList:
         # Empty list shouldn't create id variables
         assert "first_todo_id" not in context.variables
         assert "last_todo_id" not in context.variables
-        # But should still have step output
-        assert context.variables["step_1_output"] == []
+        # But should still have step output (the TodoListOutput model)
+        assert context.variables["step_1_output"] == todos
 
 
 class TestVariableExtractionFromDict:
     """Test automatic variable extraction from dict outputs."""
 
     def test_extract_id_from_dict(self):
-        """Test extraction of ID from dict output."""
+        """Test extraction of ID from TodoAddOutput."""
         context = ExecutionContext()
-        todo = {"id": "abc-123", "text": "New task", "completed": False}
+        output = TodoAddOutput(
+            todo=TodoItem(id="abc-123", text="New task", completed=False, created_at="2024-01-01T00:00:00Z")
+        )
         step = ExecutionStep(
             step_number=1,
             tool_name="todo_store",
             tool_input={"action": "add", "text": "New task"},
             success=True,
-            output=todo,
+            output=output,
             attempts=1,
         )
 
@@ -189,12 +225,12 @@ class TestVariableExtractionFromDict:
         assert context.variables["step_1_id"] == "abc-123"
 
     def test_extract_result_from_dict(self):
-        """Test extraction of result field from dict."""
+        """Test extraction of result field from CalculatorOutput."""
         context = ExecutionContext()
-        output = {"result": 42, "status": "success"}
+        output = CalculatorOutput(result=42.0, expression="40 + 2")
         step = ExecutionStep(
             step_number=1,
-            tool_name="custom_tool",
+            tool_name="calculator",
             tool_input={},
             success=True,
             output=output,
@@ -203,7 +239,7 @@ class TestVariableExtractionFromDict:
 
         context.record_step(step)
 
-        assert context.variables["step_1_result"] == 42
+        assert context.variables["step_1_result"] == 42.0
 
 
 class TestVariableExtractionFromScalar:
@@ -266,52 +302,43 @@ class TestVariableResolution:
         context = ExecutionContext()
         context.variables["user_id"] = "abc-123"
 
-        tool_input = {"action": "get", "id": "{user_id}"}
+        tool_input = TodoGetInput(action="get", todo_id="{user_id}")
         resolved = context.resolve_variables(tool_input)
 
-        assert resolved == {"action": "get", "id": "abc-123"}
+        assert resolved["action"] == "get"
+        assert resolved["todo_id"] == "abc-123"
 
     def test_resolve_angle_bracket_syntax(self):
         """Test variable resolution with <var> syntax."""
         context = ExecutionContext()
         context.variables["user_id"] = "abc-123"
 
-        tool_input = {"action": "get", "id": "<user_id>"}
+        tool_input = TodoGetInput(action="get", todo_id="<user_id>")
         resolved = context.resolve_variables(tool_input)
 
-        assert resolved == {"action": "get", "id": "abc-123"}
+        assert resolved["action"] == "get"
+        assert resolved["todo_id"] == "abc-123"
 
     def test_resolve_nested_dict(self):
-        """Test nested dict variable resolution."""
+        """Test variable resolution with calculator expression containing variables."""
         context = ExecutionContext()
-        context.variables["todo_id"] = "xyz-789"
+        context.variables["value"] = "10"
 
-        tool_input = {"action": "update", "params": {"id": "{todo_id}", "status": "complete"}}
+        tool_input = CalculatorInput(expression="{value} + 5")
         resolved = context.resolve_variables(tool_input)
 
-        assert resolved["params"]["id"] == "xyz-789"
-        assert resolved["params"]["status"] == "complete"
-
-    def test_resolve_list_variables(self):
-        """Test variable resolution in lists."""
-        context = ExecutionContext()
-        context.variables["id1"] = "aaa"
-        context.variables["id2"] = "bbb"
-
-        tool_input = {"ids": ["{id1}", "{id2}", "ccc"]}
-        resolved = context.resolve_variables(tool_input)
-
-        assert resolved == {"ids": ["aaa", "bbb", "ccc"]}
+        assert resolved["expression"] == "10 + 5"
 
     def test_resolve_partial_string_replacement(self):
-        """Test partial string variable replacement."""
+        """Test partial string variable replacement in todo text."""
         context = ExecutionContext()
         context.variables["user"] = "alice"
 
-        tool_input = {"message": "Hello {user}!"}
+        tool_input = TodoAddInput(action="add", text="Hello {user}!")
         resolved = context.resolve_variables(tool_input)
 
-        assert resolved == {"message": "Hello alice!"}
+        assert resolved["action"] == "add"
+        assert resolved["text"] == "Hello alice!"
 
     def test_resolve_multiple_variables_in_string(self):
         """Test multiple variable replacement in single string."""
@@ -319,35 +346,29 @@ class TestVariableResolution:
         context.variables["first"] = "Alice"
         context.variables["last"] = "Smith"
 
-        tool_input = {"name": "{first} {last}"}
+        tool_input = TodoAddInput(action="add", text="{first} {last}")
         resolved = context.resolve_variables(tool_input)
 
-        assert resolved == {"name": "Alice Smith"}
+        assert resolved["action"] == "add"
+        assert resolved["text"] == "Alice Smith"
 
     def test_resolve_type_preservation(self):
-        """Test type preservation for full variable replacement."""
+        """Test that string variables are substituted into string fields."""
         context = ExecutionContext()
-        context.variables["count"] = 42
-        context.variables["items"] = ["a", "b", "c"]
-        context.variables["enabled"] = True
+        context.variables["todo_id"] = "abc-123"
 
-        tool_input = {
-            "count": "{count}",
-            "items": "{items}",
-            "enabled": "{enabled}",
-        }
+        tool_input = TodoCompleteInput(action="complete", todo_id="{todo_id}")
         resolved = context.resolve_variables(tool_input)
 
-        assert resolved["count"] == 42  # int preserved
-        assert resolved["items"] == ["a", "b", "c"]  # list preserved
-        assert resolved["enabled"] is True  # bool preserved
+        assert resolved["action"] == "complete"
+        assert resolved["todo_id"] == "abc-123"  # string variable resolved
 
     def test_resolve_variable_not_found_error(self):
         """Test error on undefined variable."""
         context = ExecutionContext()
         context.variables["foo"] = "bar"
 
-        tool_input = {"key": "{undefined}"}
+        tool_input = TodoGetInput(action="get", todo_id="{undefined}")
 
         with pytest.raises(ValueError, match="Variable 'undefined' not found"):
             context.resolve_variables(tool_input)
@@ -358,7 +379,7 @@ class TestVariableResolution:
         context.variables["var1"] = "value1"
         context.variables["var2"] = "value2"
 
-        tool_input = {"key": "{missing}"}
+        tool_input = TodoGetInput(action="get", todo_id="{missing}")
 
         with pytest.raises(ValueError, match="Variable 'missing' not found") as exc_info:
             context.resolve_variables(tool_input)
@@ -410,10 +431,10 @@ class TestManualVariableManagement:
         context = ExecutionContext()
         context.set_variable("api_key", "secret-123")
 
-        tool_input = {"auth": "{api_key}"}
+        tool_input = CalculatorInput(expression="{api_key}")
         resolved = context.resolve_variables(tool_input)
 
-        assert resolved == {"auth": "secret-123"}
+        assert resolved["expression"] == "secret-123"
 
     def test_overwrite_variable(self):
         """Test that manual setting can overwrite auto-extracted variables."""
@@ -524,16 +545,21 @@ class TestMultiStepWorkflow:
         context = ExecutionContext()
 
         # Step 1: List todos
-        todos = [
-            {"id": "abc-123", "text": "Buy milk"},
-            {"id": "def-456", "text": "Walk dog"},
-        ]
+        todos_output = TodoListOutput(
+            todos=[
+                TodoItem(id="abc-123", text="Buy milk", completed=False, created_at="2024-01-01T00:00:00Z"),
+                TodoItem(id="def-456", text="Walk dog", completed=False, created_at="2024-01-01T00:00:00Z"),
+            ],
+            total_count=2,
+            completed_count=0,
+            pending_count=2,
+        )
         step1 = ExecutionStep(
             step_number=1,
             tool_name="todo_store",
             tool_input={"action": "list"},
             success=True,
-            output=todos,
+            output=todos_output,
             attempts=1,
         )
         context.record_step(step1)
@@ -542,25 +568,34 @@ class TestMultiStepWorkflow:
         assert context.variables["first_todo_id"] == "abc-123"
 
         # Step 2: Complete first todo using variable
-        tool_input_step2 = {"action": "complete", "todo_id": "{first_todo_id}"}
+        tool_input_step2 = TodoCompleteInput(action="complete", todo_id="{first_todo_id}")
         resolved_input = context.resolve_variables(tool_input_step2)
 
         # This resolves the original "Todo not found: <first_todo_id>" error
         assert resolved_input["todo_id"] == "abc-123"
 
+        completed_output = TodoCompleteOutput(
+            todo=TodoItem(
+                id="abc-123",
+                text="Buy milk",
+                completed=True,
+                created_at="2024-01-01T00:00:00Z",
+                completed_at="2024-01-01T01:00:00Z",
+            )
+        )
         step2 = ExecutionStep(
             step_number=2,
             tool_name="todo_store",
             tool_input=resolved_input,
             success=True,
-            output={"id": "abc-123", "completed": True},
+            output=completed_output,
             attempts=1,
         )
         context.record_step(step2)
 
         # Verify workflow completed successfully
         assert len(context.get_execution_log()) == 2
-        assert context.step_outputs[2]["completed"] is True
+        assert context.step_outputs[2].todo.completed is True
 
     def test_calculator_chain_workflow(self):
         """Test calculator chain: calc → reference → calc."""
@@ -578,7 +613,7 @@ class TestMultiStepWorkflow:
         context.record_step(step1)
 
         # Step 2: Use previous result
-        tool_input_step2 = {"expression": "{step_1_value} / 2"}
+        tool_input_step2 = CalculatorInput(expression="{step_1_value} / 2")
         resolved_input = context.resolve_variables(tool_input_step2)
         assert resolved_input["expression"] == "50.0 / 2"
 
@@ -595,44 +630,49 @@ class TestMultiStepWorkflow:
         assert context.variables["step_2_value"] == 25.0
 
     def test_complex_multi_step_workflow(self):
-        """Test complex workflow with multiple variable types."""
+        """Test complex workflow with multiple variable types using real tool inputs."""
+
         context = ExecutionContext()
 
-        # Step 1: List operation
-        items = [
-            {"id": "item-1", "name": "First"},
-            {"id": "item-2", "name": "Second"},
-        ]
+        # Step 1: List todos operation
+        todos_output = TodoListOutput(
+            todos=[
+                TodoItem(id="item-1", text="First", completed=False, created_at="2024-01-01T00:00:00Z"),
+                TodoItem(id="item-2", text="Second", completed=False, created_at="2024-01-01T00:00:00Z"),
+            ],
+            total_count=2,
+            completed_count=0,
+            pending_count=2,
+        )
         step1 = ExecutionStep(
             step_number=1,
-            tool_name="list_tool",
-            tool_input={},
+            tool_name="todo_store",
+            tool_input=TodoListInput(action="list"),
             success=True,
-            output=items,
+            output=todos_output,
             attempts=1,
         )
         context.record_step(step1)
 
-        # Step 2: Process first item
-        tool_input_step2 = {
-            "id": "{first_todo_id}",
-            "count": "{step_1_count}",
-        }
+        # Step 2: Get first todo using variable
+        tool_input_step2 = TodoGetInput(action="get", todo_id="{first_todo_id}")
         resolved_input = context.resolve_variables(tool_input_step2)
-        assert resolved_input["id"] == "item-1"
-        assert resolved_input["count"] == 2
+        assert resolved_input["todo_id"] == "item-1"
 
+        get_output = TodoGetOutput(
+            todo=TodoItem(id="item-1", text="First todo", completed=False, created_at="2024-01-01T00:00:00Z")
+        )
         step2 = ExecutionStep(
             step_number=2,
-            tool_name="process_tool",
-            tool_input=resolved_input,
+            tool_name="todo_store",
+            tool_input=TodoGetInput(todo_id=resolved_input["todo_id"]),
             success=True,
-            output={"processed": True, "result": 42},
+            output=get_output,
             attempts=1,
         )
         context.record_step(step2)
 
-        # Step 3: Use result from step 2
-        tool_input_step3 = {"value": "{step_2_result}"}
+        # Step 3: Complete todo using variable (testing step_N_id extraction)
+        tool_input_step3 = TodoCompleteInput(action="complete", todo_id="{step_2_id}")
         resolved_input = context.resolve_variables(tool_input_step3)
-        assert resolved_input["value"] == 42
+        assert resolved_input["todo_id"] == "item-1"

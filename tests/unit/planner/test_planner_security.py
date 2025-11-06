@@ -291,9 +291,9 @@ class TestInputLengthValidation:
 
         # Verify no step has oversized text
         for step in plan.steps:
-            if "text" in step.tool_input:
-                assert len(step.tool_input["text"]) <= 200, (
-                    f"Todo text exceeds max length: {len(step.tool_input['text'])} chars"
+            if hasattr(step.tool_input, "text"):
+                assert len(step.tool_input.text) <= 200, (
+                    f"Todo text exceeds max length: {len(step.tool_input.text)} chars"
                 )
 
 
@@ -322,7 +322,7 @@ class TestSecurityEdgeCases:
         # Should handle Unicode gracefully
         plan = planner.create_plan(prompt)
         assert len(plan.steps) == 1
-        assert "日本語" in plan.steps[0].tool_input["text"]
+        assert "日本語" in plan.steps[0].tool_input.text
 
     def test_special_regex_characters_in_prompt(self):
         """Test handling of special regex characters."""
@@ -345,7 +345,7 @@ class TestSecurityEdgeCases:
         assert len(plan.steps) == 1
         # Should be stored as-is (no SQL execution in planner)
         # Note: Prompt is lowercased during processing
-        assert "drop table" in plan.steps[0].tool_input["text"].lower()
+        assert "drop table" in plan.steps[0].tool_input.text.lower()
 
     def test_command_injection_attempt(self):
         """Test that command injection attempts are handled safely."""
@@ -356,7 +356,7 @@ class TestSecurityEdgeCases:
         plan = planner.create_plan(prompt)
         assert len(plan.steps) == 1
         # Should be stored as-is (no shell execution in planner)
-        assert "$(rm" in plan.steps[0].tool_input["text"]
+        assert "$(rm" in plan.steps[0].tool_input.text
 
 
 class TestPerformanceRegression:

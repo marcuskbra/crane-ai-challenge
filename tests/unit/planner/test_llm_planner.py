@@ -42,7 +42,7 @@ async def test_llm_planner_success(mock_openai):
     assert isinstance(plan, Plan)
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_name == "calculator"
-    assert plan.steps[0].tool_input["expression"] == "2+3"
+    assert plan.steps[0].tool_input.expression == "2+3"
     assert planner.last_token_count == 125
 
 
@@ -71,8 +71,8 @@ async def test_llm_planner_multi_step(mock_openai):
     assert len(plan.steps) == 2
     assert plan.steps[0].tool_name == "calculator"
     assert plan.steps[1].tool_name == "todo_store"
-    assert plan.steps[1].tool_input["action"] == "add"
-    assert plan.steps[1].tool_input["text"] == "Buy milk"
+    assert plan.steps[1].tool_input.action == "add"
+    assert plan.steps[1].tool_input.text == "Buy milk"
 
 
 @pytest.mark.asyncio
@@ -265,8 +265,8 @@ async def test_todo_operations(mock_openai):
     # Assertions
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_name == "todo_store"
-    assert plan.steps[0].tool_input["action"] == "add"
-    assert plan.steps[0].tool_input["text"] == "Buy groceries"
+    assert plan.steps[0].tool_input.action == "add"
+    assert plan.steps[0].tool_input.text == "Buy groceries"
 
 
 @pytest.mark.asyncio
@@ -333,22 +333,22 @@ async def test_complex_multi_step_with_variable_resolution(mock_openai):
     # Step 1: Initial calculation
     assert plan.steps[0].step_number == 1
     assert plan.steps[0].tool_name == "calculator"
-    assert plan.steps[0].tool_input["expression"] == "(42 * 8) + 15"
+    assert plan.steps[0].tool_input.expression == "(42 * 8) + 15"
     assert "initial expression" in plan.steps[0].reasoning.lower()
 
     # Step 2: Multiply by 2 using variable reference
     assert plan.steps[1].step_number == 2
     assert plan.steps[1].tool_name == "calculator"
-    assert "{step_1_output}" in plan.steps[1].tool_input["expression"]
-    assert plan.steps[1].tool_input["expression"] == "{step_1_output} * 2"
+    assert "{step_1_output}" in plan.steps[1].tool_input.expression
+    assert plan.steps[1].tool_input.expression == "{step_1_output} * 2"
     assert "multiply" in plan.steps[1].reasoning.lower()
 
     # Step 3: Add result as todo using variable reference
     assert plan.steps[2].step_number == 3
     assert plan.steps[2].tool_name == "todo_store"
-    assert plan.steps[2].tool_input["action"] == "add"
-    assert "{step_2_output}" in plan.steps[2].tool_input["text"]
-    assert "Result: {step_2_output}" == plan.steps[2].tool_input["text"]
+    assert plan.steps[2].tool_input.action == "add"
+    assert "{step_2_output}" in plan.steps[2].tool_input.text
+    assert "Result: {step_2_output}" == plan.steps[2].tool_input.text
     assert "todo" in plan.steps[2].reasoning.lower()
 
     # Verify token tracking
