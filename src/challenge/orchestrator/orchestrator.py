@@ -14,8 +14,8 @@ from datetime import datetime, timezone
 from challenge.models.run import Run, RunStatus
 from challenge.orchestrator.execution_context import ExecutionContext
 from challenge.orchestrator.execution_engine import ExecutionEngine
-from challenge.orchestrator.metrics_tracker import MetricsTracker
 from challenge.orchestrator.run_manager import RunManager
+from challenge.planner.metrics_tracker import MetricsTracker
 from challenge.planner.planner import PatternBasedPlanner
 from challenge.planner.protocol import Planner
 from challenge.tools.registry import ToolRegistry, get_tool_registry

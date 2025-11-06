@@ -10,7 +10,7 @@ import re
 from typing import Any, TypeAlias
 
 from challenge.models.run import ExecutionStep
-from challenge.orchestrator.type_guards import (
+from challenge.tools.type_guards import (
     is_calculator_output,
     is_todo_list_output,
     is_todo_single_output,

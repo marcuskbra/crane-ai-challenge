@@ -13,8 +13,8 @@ import time
 from challenge.models.plan import PlanStep
 from challenge.models.run import ExecutionStep
 from challenge.orchestrator.execution_context import ExecutionContext
-from challenge.orchestrator.protocols import ToolProvider
 from challenge.tools import BaseTool
+from challenge.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +33,14 @@ class ExecutionEngine:
 
     def __init__(
         self,
-        tools: ToolProvider,
+        tools: ToolRegistry,
         max_retries: int = 3,
     ):
         """
         Initialize execution engine.
 
         Args:
-            tools: Tool provider for tool lookup
+            tools: Tool registry for tool lookup
             max_retries: Maximum retry attempts per step (default: 3)
 
         """
