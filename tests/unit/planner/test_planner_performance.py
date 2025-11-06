@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from challenge.planner.planner import PatternBasedPlanner
+from challenge.services.planning.planner import PatternBasedPlanner
 
 
 class TestPatternCompilationPerformance:

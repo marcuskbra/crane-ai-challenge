@@ -19,7 +19,7 @@ from typing import ClassVar, Dict
 
 import pytest
 
-from challenge.planner.planner import PatternBasedPlanner
+from challenge.services.planning.planner import PatternBasedPlanner
 
 
 class TestReDoSPerformance:

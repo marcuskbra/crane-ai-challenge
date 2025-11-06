@@ -8,50 +8,85 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture Overview
 
-This project uses a **simplified 3-layer architecture** following YAGNI principles:
+This project uses **Clean Architecture** with clear separation of concerns and dependency inversion:
 
 ### Layer Structure
-- **API Layer** (`api/`): HTTP interface and request/response handling
-- **Service Layer** (`services/`): Business logic and orchestration (add when needed)
-- **Data Layer** (`models/`): Data models and repository abstractions (add when needed)
-- **Core** (`core/`): Shared utilities, config, and exceptions
+
+```
+src/challenge/
+├── domain/              # Domain Layer (Core Business Logic)
+│   ├── models/         # Domain entities (Plan, Run, etc.)
+│   ├── services/       # Domain services (complex business logic)
+│   └── types.py        # Value objects and type definitions
+│
+├── services/           # Application Service Layer
+│   ├── planning/       # Planning service
+│   └── orchestration/  # Orchestration service
+│
+├── infrastructure/     # Infrastructure Layer
+│   └── tools/         # Tool implementations
+│       ├── base.py         # Tool protocol
+│       ├── registry.py     # Tool registry
+│       ├── type_guards.py  # Type utilities
+│       └── implementations/
+│           ├── calculator.py
+│           └── todo_store.py
+│
+├── api/                # API Layer (HTTP Interface)
+│   ├── routes/        # Route handlers
+│   ├── schemas/       # API request/response schemas
+│   └── dependencies.py # Dependency injection
+│
+└── core/              # Cross-cutting Concerns
+    ├── config.py      # Configuration
+    └── exceptions.py  # Custom exceptions
+```
 
 ### Design Principles
-- **YAGNI (You Aren't Gonna Need It)**: Start simple, add complexity only when needed
+- **Clean Architecture**: Dependencies flow inward (API → Services → Domain)
+- **Domain-Centric**: Core business logic independent of external concerns
+- **Dependency Inversion**: Infrastructure depends on domain abstractions
 - **Clear separation of concerns**: Each layer has specific, well-defined responsibilities
-- **Pythonic patterns**: Standard exceptions, simple fixtures, FastAPI dependency injection
-- **Gradual adoption**: Begin with API layer, add Services/Models as requirements grow
-- **Testability**: Easy to test each layer in isolation with simple fixtures
+- **Type safety**: Strong typing with Pydantic models throughout
 
-### When to Add Each Layer
+### Layer Responsibilities
 
-**Start with API Layer Only** (Current state):
-- Simple CRUD operations
-- Stateless transformations
-- Direct database queries via ORM
+**Domain Layer** (`domain/`):
+- Core business entities (Plan, Run, ExecutionStep)
+- Domain types and value objects (ToolInput, ToolOutput)
+- Domain services (when business logic spans multiple entities)
+- **Independent** of infrastructure and external concerns
 
-**Add Service Layer When**:
-- Business logic spans multiple resources
-- Complex orchestration needed
-- Shared logic across endpoints
-- Transaction management required
+**Application Services** (`services/`):
+- Planning service: Converts prompts to execution plans
+- Orchestration service: Executes plans and manages runs
+- Coordinates domain logic and infrastructure
 
-**Add Repository/Models Layer When**:
-- Multiple data sources (database + cache + external API)
-- Complex query logic needs abstraction
-- Need to swap implementations (testing, migration)
+**Infrastructure** (`infrastructure/`):
+- Tool implementations (calculator, todo_store)
+- External integrations
+- Depends on domain abstractions (protocols, types)
+
+**API Layer** (`api/`):
+- HTTP interface with FastAPI
+- Request/response schemas (separate from domain models)
+- Route handlers delegate to services
+
+**Core** (`core/`):
+- Shared utilities, configuration, exceptions
+- Used across all layers
+
+### Dependency Flow
+- API → Services → Domain ← Infrastructure
+- Domain layer has NO dependencies on other layers
+- Infrastructure implements domain protocols
 
 ### Architecture Benefits
-- **Simplicity**: No over-engineering, appropriate for project size
-- **Maintainability**: Clear boundaries between concerns
-- **Extensibility**: Can add layers incrementally as complexity grows
-- **Type safety**: Strong typing with Pydantic models throughout
-- **Fast feedback**: Simple structure means faster development cycles
-
-### Layer Details
-
-For a complete example with CRUD operations, dependency injection, and testing patterns,
-see `claudedocs/simplified_architecture_example.md`
+- **Maintainability**: Clear boundaries and responsibilities
+- **Testability**: Each layer testable in isolation
+- **Scalability**: Easy to add complexity in appropriate layers
+- **Type safety**: Strong typing throughout with Pydantic
+- **Flexibility**: Can swap infrastructure implementations
 
 ## Build & Test Commands
 
@@ -336,81 +371,108 @@ def test_get_user_endpoint_not_found(test_client):
 
 ### Adding a New API Endpoint
 1. Create route handler in `src/challenge/api/routes/`
-2. Define request/response schemas in `api/schemas/` (if needed)
-3. Implement business logic inline or call service layer
-4. Handle exceptions and convert to HTTP responses
-5. Write tests in `tests/unit/api/routes/`
+2. Define request/response schemas in `api/schemas/` (ALWAYS separate from routes)
+3. Import domain models from `domain/models/`
+4. Delegate to services for business logic
+5. Handle exceptions and convert to HTTP responses
+6. Write tests in `tests/unit/api/routes/`
 
 Example:
 ```python
+# api/schemas/users.py
+from pydantic import BaseModel, EmailStr
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    name: str
+
 # api/routes/users.py
 from fastapi import APIRouter, HTTPException, status
+from challenge.api.schemas.users import UserCreate
+from challenge.domain.models.user import User
 
 router = APIRouter()
 
-@router.get("/users/{user_id}")
-async def get_user(user_id: str):
+@router.post("/users", response_model=User)
+async def create_user(data: UserCreate):
     try:
-        user = await get_user_from_db(user_id)
-        return user
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-```
-
-### Adding Business Logic (Service Layer)
-When logic grows beyond simple CRUD:
-
-1. Create service class in `src/challenge/services/`
-2. Use dependency injection via `api/dependencies.py`
-3. Raise standard exceptions for errors
-4. Write tests in `tests/unit/services/`
-
-Example:
-```python
-# services/user_service.py
-class UserService:
-    def __init__(self, db: Database):
-        self.db = db
-
-    async def create_user(self, data: dict) -> dict:
-        if await self.db.user_exists(data["email"]):
-            raise ValueError("User already exists")
-        return await self.db.create_user(data)
-
-# api/dependencies.py
-def get_user_service() -> UserService:
-    return UserService(database=get_database())
-
-# api/routes/users.py
-@router.post("/users")
-async def create_user(
-    data: UserCreate,
-    service: UserService = Depends(get_user_service)
-):
-    try:
-        user = await service.create_user(data.model_dump())
+        user = await create_user_service(data)
         return user
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 ```
 
-### Adding Data Models
-When you need structured data types:
+### Adding Domain Models
+Core business entities go in the domain layer:
 
-1. Create Pydantic models in `src/challenge/models/`
-2. Use for request/response schemas
-3. Include validation rules
-4. Write validation tests
+1. Create Pydantic models in `src/challenge/domain/models/`
+2. Models should be independent of infrastructure
+3. Import domain types from `domain/types.py`
+4. Write validation tests in `tests/unit/domain/`
 
 Example:
 ```python
-# models/user.py
+# domain/models/user.py
 from pydantic import BaseModel, EmailStr, Field
 
 class User(BaseModel):
+    """User domain entity."""
     id: str = Field(..., description="User ID")
     email: EmailStr = Field(..., description="Email address")
     name: str = Field(..., min_length=1, max_length=100)
+```
+
+### Adding Application Services
+Business logic and orchestration:
+
+1. Create service in `src/challenge/services/` (planning, orchestration, etc.)
+2. Import domain models from `domain/models/`
+3. Use dependency injection via `api/dependencies.py`
+4. Raise standard exceptions for errors
+5. Write tests in `tests/unit/services/`
+
+Example:
+```python
+# services/user_service.py
+from challenge.domain.models.user import User
+
+class UserService:
+    def __init__(self, repository: UserRepository):
+        self.repository = repository
+
+    async def create_user(self, email: str, name: str) -> User:
+        if await self.repository.exists(email):
+            raise ValueError("User already exists")
+        return await self.repository.create(User(email=email, name=name))
+
+# api/dependencies.py
+from challenge.services.user_service import UserService
+
+def get_user_service() -> UserService:
+    return UserService(repository=get_user_repository())
+```
+
+### Adding Infrastructure (Tools, External Services)
+Implementation of external concerns:
+
+1. Create implementation in `src/challenge/infrastructure/`
+2. Implement domain protocols/interfaces
+3. Import domain types, never the reverse
+4. Write tests in `tests/unit/infrastructure/`
+
+Example:
+```python
+# infrastructure/tools/implementations/new_tool.py
+from challenge.infrastructure.tools.base import BaseTool, ToolResult
+from challenge.domain.types import ToolInput
+
+class NewTool(BaseTool):
+    """New tool implementation."""
+
+    async def execute(self, tool_input: ToolInput) -> ToolResult:
+        # Implementation
+        pass
+```
 
 ## Important Reminders
 

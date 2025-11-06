@@ -10,7 +10,7 @@ Tests cover:
 
 import pytest
 
-from challenge.tools.calculator import CalculatorTool
+from challenge.infrastructure.tools.implementations.calculator import CalculatorTool
 
 
 class TestCalculatorTool:

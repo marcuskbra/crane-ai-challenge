@@ -10,11 +10,11 @@ from fastapi import status
 
 from challenge.api.routes.metrics import get_metrics
 from challenge.api.schemas.metrics import MetricsResponse
-from challenge.models.plan import Plan, PlanStep
-from challenge.models.run import ExecutionStep, Run, RunStatus
-from challenge.orchestrator.orchestrator import Orchestrator
-from challenge.planner.planner import PatternBasedPlanner
-from challenge.tools.registry import get_tool_registry
+from challenge.domain.models.plan import Plan, PlanStep
+from challenge.domain.models.run import ExecutionStep, Run, RunStatus
+from challenge.infrastructure.tools.registry import get_tool_registry
+from challenge.services.orchestration.orchestrator import Orchestrator
+from challenge.services.planning.planner import PatternBasedPlanner
 
 
 @pytest.fixture

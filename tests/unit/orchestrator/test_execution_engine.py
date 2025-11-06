@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from challenge.models.plan import PlanStep
-from challenge.orchestrator.execution_engine import ExecutionEngine
-from challenge.tools.base import BaseTool, ToolMetadata, ToolResult
+from challenge.domain.models.plan import PlanStep
+from challenge.infrastructure.tools.base import BaseTool, ToolMetadata, ToolResult
+from challenge.services.orchestration.execution_engine import ExecutionEngine
 
 
 class MockTool(BaseTool):

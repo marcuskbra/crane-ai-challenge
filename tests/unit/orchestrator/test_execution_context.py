@@ -6,9 +6,8 @@ the fix for the "Todo not found: <first_todo_id>" error.
 
 import pytest
 
-from challenge.models.run import ExecutionStep
-from challenge.orchestrator.execution_context import ExecutionContext
-from challenge.tools.types import (
+from challenge.domain.models.run import ExecutionStep
+from challenge.domain.types import (
     CalculatorInput,
     CalculatorOutput,
     TodoAddInput,
@@ -21,6 +20,7 @@ from challenge.tools.types import (
     TodoListInput,
     TodoListOutput,
 )
+from challenge.services.orchestration.execution_context import ExecutionContext
 
 
 class TestExecutionContext:

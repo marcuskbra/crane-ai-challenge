@@ -12,8 +12,8 @@ Verifies:
 import pytest
 from pydantic import ValidationError
 
-from challenge.models.plan import Plan, PlanStep
-from challenge.planner.examples import (
+from challenge.domain.models.plan import Plan, PlanStep
+from challenge.services.planning.examples import (
     ALL_EXAMPLES,
     EXAMPLE_CALCULATION_THEN_TODO,
     EXAMPLE_MULTI_TODO_OPERATIONS,
@@ -25,7 +25,7 @@ from challenge.planner.examples import (
     format_example_for_prompt,
     get_examples_by_complexity,
 )
-from challenge.planner.llm_planner import LLMPlanner
+from challenge.services.planning.llm_planner import LLMPlanner
 
 
 class TestFewShotExample:

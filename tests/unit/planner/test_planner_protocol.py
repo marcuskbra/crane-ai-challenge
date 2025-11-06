@@ -10,11 +10,11 @@ This test suite shows how the Protocol enables:
 
 import pytest
 
-from challenge.models.plan import Plan, PlanStep
-from challenge.orchestrator.orchestrator import Orchestrator
-from challenge.planner.llm_planner import LLMPlanner
-from challenge.planner.planner import PatternBasedPlanner
-from challenge.planner.protocol import Planner
+from challenge.domain.models.plan import Plan, PlanStep
+from challenge.services.orchestration.orchestrator import Orchestrator
+from challenge.services.planning.llm_planner import LLMPlanner
+from challenge.services.planning.planner import PatternBasedPlanner
+from challenge.services.planning.protocol import Planner
 
 
 # Custom planner without inheriting from any base class

@@ -8,8 +8,8 @@ import asyncio
 
 import pytest
 
-from challenge.models.run import Run, RunStatus
-from challenge.orchestrator.run_manager import RunManager
+from challenge.domain.models.run import Run, RunStatus
+from challenge.services.orchestration.run_manager import RunManager
 
 
 class TestRunManager:

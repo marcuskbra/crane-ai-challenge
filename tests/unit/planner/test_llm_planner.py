@@ -4,16 +4,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from challenge.models.plan import Plan
-from challenge.models.run import ExecutionStep
-from challenge.orchestrator.execution_context import ExecutionContext
-from challenge.planner.llm_planner import LLMPlanner
+from challenge.domain.models.plan import Plan
+from challenge.domain.models.run import ExecutionStep
+from challenge.services.orchestration.execution_context import ExecutionContext
+from challenge.services.planning.llm_planner import LLMPlanner
 
 
 @pytest.fixture
 def mock_openai():
     """Mock OpenAI client."""
-    with patch("challenge.planner.llm_planner.AsyncOpenAI") as mock:
+    with patch("challenge.services.planning.llm_planner.AsyncOpenAI") as mock:
         yield mock
 
 

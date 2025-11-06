@@ -9,12 +9,12 @@ This module tests the complete workflow of:
 
 import pytest
 
-from challenge.models import ExecutionStep
-from challenge.models.plan import PlanStep
-from challenge.orchestrator.execution_context import ExecutionContext
-from challenge.orchestrator.execution_engine import ExecutionEngine
-from challenge.tools.registry import get_tool_registry
-from challenge.tools.types import TodoCompleteInput, TodoItem, TodoListOutput
+from challenge.domain.models import ExecutionStep
+from challenge.domain.models.plan import PlanStep
+from challenge.domain.types import TodoCompleteInput, TodoItem, TodoListOutput
+from challenge.infrastructure.tools.registry import get_tool_registry
+from challenge.services.orchestration.execution_context import ExecutionContext
+from challenge.services.orchestration.execution_engine import ExecutionEngine
 
 
 @pytest.fixture(autouse=True)

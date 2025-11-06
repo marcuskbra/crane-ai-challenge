@@ -20,10 +20,10 @@ from fastapi.testclient import TestClient
 from challenge.api.dependencies import get_orchestrator
 from challenge.api.main import create_app
 from challenge.core.config import Settings
-from challenge.orchestrator.orchestrator import Orchestrator
-from challenge.planner.llm_planner import LLMPlanner
-from challenge.planner.planner import PatternBasedPlanner
-from challenge.tools.registry import get_tool_registry
+from challenge.infrastructure.tools.registry import get_tool_registry
+from challenge.services.orchestration.orchestrator import Orchestrator
+from challenge.services.planning.llm_planner import LLMPlanner
+from challenge.services.planning.planner import PatternBasedPlanner
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))

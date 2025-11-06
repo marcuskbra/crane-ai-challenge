@@ -18,11 +18,11 @@ from typing import Annotated
 from fastapi import Depends
 
 from challenge.core.config import Settings, get_settings
-from challenge.orchestrator.orchestrator import Orchestrator
-from challenge.planner.llm_planner import LLMPlanner
-from challenge.planner.planner import PatternBasedPlanner
-from challenge.tools import ToolRegistry
-from challenge.tools.registry import get_tool_registry
+from challenge.infrastructure.tools import ToolRegistry
+from challenge.infrastructure.tools.registry import get_tool_registry
+from challenge.services.orchestration.orchestrator import Orchestrator
+from challenge.services.planning.llm_planner import LLMPlanner
+from challenge.services.planning.planner import PatternBasedPlanner
 
 # ============================================================================
 # Core Dependencies

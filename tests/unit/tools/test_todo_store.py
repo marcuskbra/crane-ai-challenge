@@ -10,7 +10,7 @@ Tests cover:
 
 import pytest
 
-from challenge.tools.todo_store import TodoStoreTool
+from challenge.infrastructure.tools.implementations.todo_store import TodoStoreTool
 
 
 class TestTodoStoreTool:

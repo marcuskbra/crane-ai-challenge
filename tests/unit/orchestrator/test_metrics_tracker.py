@@ -6,7 +6,7 @@ Tests metrics collection for planner performance tracking.
 
 import pytest
 
-from challenge.planner.metrics_tracker import MetricsTracker, PlannerStats
+from challenge.services.planning.metrics_tracker import MetricsTracker, PlannerStats
 
 
 class TestMetricsTracker:

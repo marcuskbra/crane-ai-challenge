@@ -17,8 +17,8 @@ from challenge.api.schemas.metrics import (
     RunsByStatusMetrics,
     ToolMetrics,
 )
-from challenge.models.run import RunStatus
-from challenge.orchestrator.orchestrator import Orchestrator
+from challenge.domain.models.run import RunStatus
+from challenge.services.orchestration.orchestrator import Orchestrator
 
 from ..dependencies import get_orchestrator
 
