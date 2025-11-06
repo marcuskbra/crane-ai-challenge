@@ -24,6 +24,7 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from challenge.core.exceptions import (
@@ -40,36 +41,24 @@ logger = logging.getLogger(__name__)
 
 
 # Standard error response schema
-class ErrorResponse:
-    """Standard error response format."""
+class ErrorResponse(BaseModel):
+    """
+    Standard error response format.
 
-    def __init__(
-        self,
-        message: str,
-        details: dict[str, Any] | None = None,
-        error_type: str | None = None,
-    ) -> None:
-        """
-        Initialize error response.
+    Provides type-safe error responses with consistent structure across
+    all API endpoints.
+    """
 
-        Args:
-            message: Human-readable error description
-            details: Additional context (optional)
-            error_type: Error classification (optional)
+    message: str = Field(..., description="Human-readable error description", alias="detail")
+    details: dict[str, Any] = Field(default_factory=dict, description="Additional context")
+    error_type: str | None = Field(None, description="Error classification")
 
-        """
-        self.message = message
-        self.details = details or {}
-        self.error_type = error_type
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON response."""
-        response: dict[str, Any] = {"detail": self.message}
-        if self.details:
-            response["details"] = self.details
-        if self.error_type:
-            response["error_type"] = self.error_type
-        return response
+    model_config = ConfigDict(
+        validate_assignment=True,
+        strict=True,
+        extra="forbid",
+        populate_by_name=True,  # Allow both 'detail' and 'message'
+    )
 
 
 # Custom exception handlers
@@ -95,7 +84,7 @@ async def run_not_found_handler(request: Request, exc: RunNotFoundError) -> JSON
 
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
@@ -121,7 +110,7 @@ async def invalid_prompt_handler(request: Request, exc: InvalidPromptError) -> J
 
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
@@ -147,7 +136,7 @@ async def plan_generation_handler(request: Request, exc: PlanGenerationError) ->
 
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
@@ -173,7 +162,7 @@ async def execution_error_handler(request: Request, exc: ExecutionError) -> JSON
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
@@ -199,7 +188,7 @@ async def service_unavailable_handler(request: Request, exc: ServiceUnavailableE
 
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
@@ -225,7 +214,7 @@ async def validation_error_handler(request: Request, exc: ValidationError) -> JS
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
@@ -253,7 +242,7 @@ async def application_error_handler(request: Request, exc: ApplicationError) -> 
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
@@ -303,7 +292,7 @@ async def request_validation_handler(request: Request, exc: RequestValidationErr
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
@@ -332,7 +321,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
     return JSONResponse(
         status_code=exc.status_code,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
         headers=getattr(exc, "headers", None),
     )
 
@@ -361,7 +350,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=error.to_dict(),
+        content=error.model_dump(by_alias=True, exclude_none=True),
     )
 
 
