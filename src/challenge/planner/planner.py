@@ -88,13 +88,18 @@ class PatternBasedPlanner:
         - Todo delete: "delete/remove todo/task X"
         - Multi-step: "X and Y", "X then Y"
 
-    Example:
-        >>> planner = PatternBasedPlanner()
-        >>> plan = planner.create_plan("calculate 2 + 3 and add todo Buy milk")
-        >>> len(plan.steps)
-        2
-
     """
+
+    @property
+    def last_token_count(self) -> int | None:
+        """
+        Token count from last planning operation.
+
+        Returns:
+            None - Pattern-based planner doesn't use LLM or track tokens.
+
+        """
+        return None
 
     def create_plan(self, prompt: str) -> Plan:
         """

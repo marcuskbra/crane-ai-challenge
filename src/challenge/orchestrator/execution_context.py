@@ -7,11 +7,20 @@ enabling variable resolution between steps in multi-step plans.
 
 import logging
 import re
-from typing import Any
+from typing import Any, TypeAlias
 
 from challenge.models.run import ExecutionStep
+from challenge.orchestrator.type_guards import is_pydantic_model
+from challenge.tools.types import ToolInput, ToolOutput
 
 logger = logging.getLogger(__name__)
+
+# Type-safe variable value constraints
+# Variables store extracted values from tool outputs:
+# - Scalar types: str, int, float, bool, None (extracted IDs, counts, results)
+# - Pydantic models: ToolOutput (for step_N_output references storing complete tool outputs)
+# All tools return strongly-typed Pydantic models (CalculatorOutput, TodoListOutput, etc.)
+VariableValue: TypeAlias = str | int | float | bool | ToolOutput | None
 
 
 class ExecutionContext:
@@ -23,29 +32,23 @@ class ExecutionContext:
     - Step output tracking: Store and retrieve outputs from previous steps
     - Reference syntax: Support {step_N_output}, {first_todo_id}, etc.
 
-    Example:
-        >>> context = ExecutionContext()
-        >>> # Step 1 returns list of todos
-        >>> context.record_step(ExecutionStep(
-        ...     step_number=1,
-        ...     tool_name="todo_store",
-        ...     tool_input={"action": "list"},
-        ...     success=True,
-        ...     output=[{"id": "abc-123", "text": "Buy milk"}],
-        ...     attempts=1
-        ... ))
-        >>> # Step 2 uses variable from step 1
-        >>> tool_input = {"action": "complete", "todo_id": "{first_todo_id}"}
-        >>> resolved = context.resolve_variables(tool_input)
-        >>> resolved["todo_id"]
-        'abc-123'
+    Note:
+        Type safety approach:
+        - step_outputs uses dict[int, ToolOutput] to store strongly-typed tool outputs
+          (CalculatorOutput, TodoListOutput, etc.)
+        - variables uses dict[str, VariableValue] for either full ToolOutput or
+          extracted scalar values (str, int, float, bool, None)
 
     """
 
     def __init__(self):
         """Initialize empty execution context."""
+        # Note: step_outputs uses Any because tools return raw Python types (lists, dicts, floats)
+        # not ToolOutput Pydantic models. ToolResult[TOutput] is generic, but output field
+        # contains raw types (e.g., float for calculator, list for todo_store).
+        # See Hybrid Typing Strategy in TYPING_GUIDE.md: strict inputs, flexible outputs.
         self.step_outputs: dict[int, Any] = {}
-        self.variables: dict[str, Any] = {}
+        self.variables: dict[str, VariableValue] = {}
         self._execution_log: list[ExecutionStep] = []
 
     def record_step(self, step: ExecutionStep) -> None:
@@ -68,7 +71,7 @@ class ExecutionContext:
             f"(success={step.success}, variables={list(self.variables.keys())})"
         )
 
-    def _extract_variables(self, step_number: int, output: Any) -> None:
+    def _extract_variables(self, step_number: int, output: ToolOutput) -> None:
         """
         Auto-extract common variables from step output.
 
@@ -80,42 +83,41 @@ class ExecutionContext:
 
         Args:
             step_number: Step number that produced the output
-            output: Step output value (any type)
+            output: Strongly-typed tool output (CalculatorOutput, TodoListOutput, etc.)
 
         """
         # Always provide step_N_output reference
         self.variables[f"step_{step_number}_output"] = output
 
-        # Extract from list outputs
-        if isinstance(output, list) and output:
-            # Count
-            self.variables[f"step_{step_number}_count"] = len(output)
+        # Handle Pydantic model outputs (TodoListOutput, TodoAddOutput, etc.)
+        if is_pydantic_model(output):
+            # TodoListOutput case: extract from .todos list
+            if hasattr(output, "todos") and isinstance(output.todos, list) and output.todos:
+                todos_list = output.todos
+                self.variables[f"step_{step_number}_count"] = len(todos_list)
 
-            # First/last item IDs (if items are dicts with 'id' field)
-            if isinstance(output[0], dict) and "id" in output[0]:
-                self.variables["first_todo_id"] = output[0]["id"]
-                self.variables[f"step_{step_number}_first_id"] = output[0]["id"]
+                # Extract first/last todo IDs
+                if hasattr(todos_list[0], "id"):
+                    self.variables["first_todo_id"] = todos_list[0].id
+                    self.variables[f"step_{step_number}_first_id"] = todos_list[0].id
 
-                if len(output) > 1:
-                    self.variables["last_todo_id"] = output[-1]["id"]
-                    self.variables[f"step_{step_number}_last_id"] = output[-1]["id"]
+                    if len(todos_list) > 1:
+                        self.variables["last_todo_id"] = todos_list[-1].id
+                        self.variables[f"step_{step_number}_last_id"] = todos_list[-1].id
 
-        # Extract from dict outputs
-        elif isinstance(output, dict):
-            # If dict has 'id', provide as last_id
-            if "id" in output:
-                self.variables["last_todo_id"] = output["id"]
-                self.variables[f"step_{step_number}_id"] = output["id"]
+            # TodoAddOutput, TodoGetOutput, TodoCompleteOutput, TodoDeleteOutput: extract from .todo
+            elif hasattr(output, "todo") and hasattr(output.todo, "id"):
+                self.variables["last_todo_id"] = output.todo.id
+                self.variables[f"step_{step_number}_id"] = output.todo.id
 
-            # Extract result field if present
-            if "result" in output:
-                self.variables[f"step_{step_number}_result"] = output["result"]
-
-        # Extract from scalar outputs
+            # CalculatorOutput case: extract from .result
+            elif hasattr(output, "result"):
+                self.variables[f"step_{step_number}_result"] = output.result
+        # Extract from scalar outputs (float, int, str returned directly by tools)
         elif isinstance(output, (int, float, str)):
             self.variables[f"step_{step_number}_value"] = output
 
-    def resolve_variables(self, tool_input: dict[str, Any]) -> dict[str, Any]:
+    def resolve_variables(self, tool_input: ToolInput) -> dict[str, Any]:
         """
         Resolve variable placeholders in tool input.
 
@@ -126,7 +128,7 @@ class ExecutionContext:
         - <variable_name>: Alternative bracket style (for compatibility)
 
         Args:
-            tool_input: Tool input dict potentially containing variables
+            tool_input: ToolInput Pydantic model (discriminated union) potentially containing variables
 
         Returns:
             New dict with variables resolved to actual values
@@ -134,46 +136,42 @@ class ExecutionContext:
         Raises:
             ValueError: If variable reference cannot be resolved
 
-        Example:
-            >>> context = ExecutionContext()
-            >>> context.variables["user_id"] = "abc-123"
-            >>> tool_input = {"action": "get", "id": "{user_id}"}
-            >>> resolved = context.resolve_variables(tool_input)
-            >>> resolved["id"]
-            'abc-123'
-
         """
+        # Convert ToolInput model to dict for variable resolution
+        tool_input_dict = tool_input.model_dump()
+
         resolved = {}
 
-        for key, value in tool_input.items():
+        for key, value in tool_input_dict.items():
             # Resolve string values containing variables
             if isinstance(value, str):
                 resolved[key] = self._resolve_string(value)
-            # Recursively resolve nested dicts
-            elif isinstance(value, dict):
-                resolved[key] = self.resolve_variables(value)
-            # Recursively resolve lists
+            # Resolve lists containing strings with variables
             elif isinstance(value, list):
                 resolved[key] = [self._resolve_string(item) if isinstance(item, str) else item for item in value]
             else:
+                # Pass through other types (int, float, bool, None, dict) unchanged
+                # ToolInput models are flat - no nested models needing variable resolution
                 resolved[key] = value
 
         return resolved
 
-    def _resolve_string(self, value: str) -> Any:
+    def _resolve_string(self, value: str) -> str | VariableValue:
         """
         Resolve variables in a string value.
 
         Supports:
         - {var_name} or <var_name> syntax
-        - Full replacement: "{var}" becomes the variable value
+        - Full replacement: "{var}" becomes the variable value (preserves type)
         - Partial replacement: "prefix {var} suffix" becomes string with var substituted
 
         Args:
             value: String potentially containing variable references
 
         Returns:
-            Resolved value (might be non-string if fully replaced)
+            - If single variable reference: Returns the actual VariableValue (preserves type)
+            - If partial/multiple variables: Returns str with substitutions
+            - If no variables: Returns original str
 
         Raises:
             ValueError: If variable reference cannot be resolved
@@ -205,7 +203,7 @@ class ExecutionContext:
 
         return result
 
-    def _get_variable(self, var_name: str) -> Any:
+    def _get_variable(self, var_name: str) -> VariableValue:
         """
         Get variable value by name.
 
@@ -213,7 +211,7 @@ class ExecutionContext:
             var_name: Variable name (without brackets)
 
         Returns:
-            Variable value
+            Strongly-typed variable value (ToolOutput, str, int, float, bool, or None)
 
         Raises:
             ValueError: If variable not found in context
@@ -228,7 +226,7 @@ class ExecutionContext:
             f"Variable '{var_name}' not found in execution context. Available variables: {available or 'none'}"
         )
 
-    def get_step_output(self, step_number: int) -> Any:
+    def get_step_output(self, step_number: int) -> ToolOutput:
         """
         Get output from a specific step.
 
@@ -236,7 +234,8 @@ class ExecutionContext:
             step_number: Step number (1-indexed)
 
         Returns:
-            Step output value
+            Strongly-typed tool output from the specified step
+            (CalculatorOutput, TodoListOutput, etc.)
 
         Raises:
             KeyError: If step not found
@@ -246,13 +245,13 @@ class ExecutionContext:
             raise KeyError(f"No output recorded for step {step_number}")
         return self.step_outputs[step_number]
 
-    def set_variable(self, name: str, value: Any) -> None:
+    def set_variable(self, name: str, value: VariableValue) -> None:
         """
         Manually set a variable in the context.
 
         Args:
             name: Variable name (without brackets)
-            value: Variable value
+            value: Variable value (must be JSON-serializable type)
 
         """
         self.variables[name] = value

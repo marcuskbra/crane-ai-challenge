@@ -3,28 +3,40 @@ Base tool interface for AI Agent Runtime.
 
 This module defines the abstract base class for all tools and standard
 result types for tool execution.
+
+Following TYPING_GUIDE.md:
+- Uses Generic[TOutput] for type-safe tool outputs
+- Eliminates Any in favor of generic type parameters
+- Enables compile-time type checking for tool results
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
+# Generic type parameter for tool output types
+# Allows tools to specify their exact output type (e.g., float, dict, list)
+TOutput = TypeVar("TOutput")
 
-class ToolResult(BaseModel):
+
+class ToolResult(BaseModel, Generic[TOutput]):
     """
-    Standard result format for tool execution.
+    Generic result format for tool execution.
+
+    Type parameter:
+        TOutput: The type of the output value (e.g., float for calculator, list for todo_store)
 
     Attributes:
         success: Whether the tool execution succeeded
-        output: The result value if successful
+        output: The strongly-typed result value if successful
         error: Error message if execution failed
         metadata: Additional metadata about the execution
 
     """
 
     success: bool = Field(..., description="Whether execution succeeded")
-    output: Any | None = Field(None, description="Result value if successful")
+    output: TOutput | None = Field(None, description="Strongly-typed result value if successful")
     error: str | None = Field(None, description="Error message if failed")
     metadata: dict[str, Any] | None = Field(None, description="Additional metadata")
 

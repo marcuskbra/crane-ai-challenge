@@ -19,11 +19,6 @@ class Settings(BaseSettings):
     All settings can be overridden via environment variables.
     For production, use a .env file or system environment variables.
 
-    Example:
-        >>> settings = get_settings()
-        >>> print(settings.app_name)
-        'Crane Challenge API'
-
     """
 
     model_config = SettingsConfigDict(
@@ -116,8 +111,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(
         default=[
             "http://localhost:3000",
+            "http://localhost:3001",
             "http://localhost:8080",
             "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
             "http://127.0.0.1:8080",
         ],
         description="Allowed CORS origins (comma-separated string or list)",
@@ -236,10 +233,6 @@ class Settings(BaseSettings):
 
         Returns:
             List of CORS origins
-
-        Example:
-            >>> Settings.parse_cors_origins("http://a.com,http://b.com")
-            ['http://a.com', 'http://b.com']
 
         """
         if isinstance(v, str):
@@ -370,12 +363,6 @@ class Settings(BaseSettings):
         Returns:
             Dictionary with LLM configuration details for logging/debugging
 
-        Example:
-            >>> settings = Settings()
-            >>> status = settings.get_llm_config_status()
-            >>> print(status["provider"])
-            'OpenAI' or 'Local LLM'
-
         """
         if self.is_using_local_llm():
             return {
@@ -402,11 +389,6 @@ def get_settings() -> Settings:
 
     Returns:
         Settings instance with all configuration values
-
-    Example:
-        >>> settings = get_settings()
-        >>> print(settings.app_name)
-        'Crane Challenge API'
 
     """
     return Settings()

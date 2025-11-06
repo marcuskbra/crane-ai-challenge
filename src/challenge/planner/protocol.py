@@ -23,14 +23,6 @@ class Planner(Protocol):
     - Concrete planners implement the interface independently
     - New planners can be added without modifying orchestrator
 
-    Example:
-        >>> class MyCustomPlanner:
-        ...     async def create_plan(self, prompt: str) -> Plan:
-        ...         # Custom implementation
-        ...         return Plan(steps=[], final_goal=prompt)
-        ...
-        >>> orchestrator = Orchestrator(planner=MyCustomPlanner())
-
     Note:
         Both sync and async implementations are supported.
         The orchestrator handles async planners automatically.
@@ -49,6 +41,23 @@ class Planner(Protocol):
 
         Raises:
             ValueError: If prompt is invalid or cannot be parsed
+
+        """
+        ...
+
+    @property
+    def last_token_count(self) -> int | None:
+        """
+        Token count from last planning operation.
+
+        Returns:
+            Number of tokens used in last create_plan call, or None if
+            token counting is not supported by this planner implementation.
+
+        Note:
+            This property enables type-safe access to token metrics without
+            runtime attribute lookup (getattr). Planners that don't track
+            tokens should return None.
 
         """
         ...

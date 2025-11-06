@@ -21,11 +21,6 @@ class ToolRegistry:
     This class implements the ToolProvider protocol through structural
     subtyping (duck typing). No explicit inheritance required.
 
-    Example:
-        >>> registry = ToolRegistry()
-        >>> calculator = registry.get("calculator")
-        >>> result = await calculator.execute(expression="2 + 2")
-
     """
 
     def __init__(self):

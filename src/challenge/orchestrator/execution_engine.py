@@ -8,11 +8,13 @@ variable resolution between steps via ExecutionContext.
 
 import asyncio
 import logging
+import time
 
 from challenge.models.plan import PlanStep
 from challenge.models.run import ExecutionStep
 from challenge.orchestrator.execution_context import ExecutionContext
 from challenge.orchestrator.protocols import ToolProvider
+from challenge.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +28,6 @@ class ExecutionEngine:
     - Exponential backoff retry (1s, 2s, 4s)
     - Tool not found errors
     - Execution result wrapping
-
-    Example:
-        >>> from challenge.tools.registry import get_tool_registry
-        >>> engine = ExecutionEngine(tools=get_tool_registry(), max_retries=3)
-        >>> result = await engine.execute_step_with_retry(step)
-        >>> assert result.success or result.attempts <= 3
 
     """
 
@@ -63,25 +59,17 @@ class ExecutionEngine:
         Returns:
             ExecutionStep with execution result
 
-        Example:
-            >>> step = PlanStep(
-            ...     step_number=1,
-            ...     tool_name="calculator",
-            ...     tool_input={"expression": "2 + 2"}
-            ... )
-            >>> result = await engine.execute_step_with_retry(step)
-            >>> assert result.success
-            >>> assert result.output == 4.0
-
         """
+        start_time = time.perf_counter()
         last_error = None
 
         for attempt in range(1, self.max_retries + 1):
             try:
                 # Get tool
-                tool = self.tools.get(step.tool_name)
+                tool: BaseTool | None = self.tools.get(step.tool_name)
 
                 if not tool:
+                    duration_ms = (time.perf_counter() - start_time) * 1000
                     return ExecutionStep(
                         step_number=step.step_number,
                         tool_name=step.tool_name,
@@ -89,10 +77,17 @@ class ExecutionEngine:
                         success=False,
                         error=f"Tool not found: {step.tool_name}",
                         attempts=attempt,
+                        duration_ms=duration_ms,
                     )
 
-                # Execute tool
-                result = await tool.execute(**step.tool_input)
+                # Execute tool (convert Pydantic model to dict for unpacking)
+                # PlanStep.tool_input is strictly typed as ToolInput (Pydantic models)
+                # so we always call model_dump() to serialize for tool execution
+                tool_input_dict = step.tool_input.model_dump()
+                result = await tool.execute(**tool_input_dict)
+
+                # Calculate duration
+                duration_ms = (time.perf_counter() - start_time) * 1000
 
                 # Return result
                 return ExecutionStep(
@@ -103,6 +98,7 @@ class ExecutionEngine:
                     output=result.output,
                     error=result.error,
                     attempts=attempt,
+                    duration_ms=duration_ms,
                 )
 
             except Exception as e:
@@ -116,6 +112,7 @@ class ExecutionEngine:
                     await asyncio.sleep(delay)
 
         # All retries exhausted
+        duration_ms = (time.perf_counter() - start_time) * 1000
         return ExecutionStep(
             step_number=step.step_number,
             tool_name=step.tool_name,
@@ -123,6 +120,7 @@ class ExecutionEngine:
             success=False,
             error=f"Failed after {self.max_retries} attempts: {last_error}",
             attempts=self.max_retries,
+            duration_ms=duration_ms,
         )
 
     async def execute_plan(
@@ -153,23 +151,6 @@ class ExecutionEngine:
         Raises:
             None - failures are captured in ExecutionStep.error
 
-        Example (without context):
-            >>> plan = [
-            ...     PlanStep(1, "calculator", {"expression": "2 + 2"}),
-            ...     PlanStep(2, "calculator", {"expression": "5 * 3"}),
-            ... ]
-            >>> results = await engine.execute_plan(plan)
-            >>> assert len(results) == 2
-
-        Example (with context for variable resolution):
-            >>> context = ExecutionContext()
-            >>> plan = [
-            ...     PlanStep(1, "todo_store", {"action": "list"}),
-            ...     PlanStep(2, "todo_store", {"action": "complete", "todo_id": "{first_todo_id}"}),
-            ... ]
-            >>> results = await engine.execute_plan(plan, context=context)
-            >>> # Step 2's {first_todo_id} is resolved from step 1's output
-
         """
         execution_log: list[ExecutionStep] = []
 
@@ -178,8 +159,12 @@ class ExecutionEngine:
             tool_input = step.tool_input
             if context:
                 try:
-                    tool_input = context.resolve_variables(step.tool_input)
-                    if tool_input != step.tool_input:
+                    # Resolve variables in ToolInput model
+                    # resolve_variables() accepts ToolInput and returns dict with resolved values
+                    resolved_dict = context.resolve_variables(step.tool_input)
+                    # Use resolved dict as tool_input for execution
+                    tool_input = resolved_dict
+                    if resolved_dict != step.tool_input.model_dump():
                         logger.info(
                             f"Step {step.step_number}: Resolved variables in tool_input: "
                             f"{step.tool_input} → {tool_input}"
@@ -193,6 +178,7 @@ class ExecutionEngine:
                         success=False,
                         error=f"Variable resolution failed: {e}",
                         attempts=1,
+                        duration_ms=0.0,
                     )
                     logger.error(f"Step {step.step_number} variable resolution failed: {e}")
                     execution_log.append(step_result)
@@ -218,6 +204,7 @@ class ExecutionEngine:
                     success=False,
                     error=f"Step timed out after {step_timeout}s",
                     attempts=1,
+                    duration_ms=step_timeout * 1000,  # Timeout duration
                 )
                 logger.error(f"Step {step.step_number} timed out after {step_timeout}s")
 

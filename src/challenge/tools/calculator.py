@@ -131,12 +131,6 @@ class CalculatorTool(BaseTool):
     This tool safely evaluates mathematical expressions using AST parsing
     instead of eval(), preventing code injection attacks.
 
-    Example:
-        >>> calculator = CalculatorTool()
-        >>> result = await calculator.execute(expression="2 + 3 * 4")
-        >>> print(result.output)
-        14.0
-
     """
 
     @property
@@ -157,7 +151,7 @@ class CalculatorTool(BaseTool):
             },
         )
 
-    async def execute(self, expression: str) -> ToolResult:
+    async def execute(self, expression: str) -> ToolResult[float]:
         """
         Execute calculator with arithmetic expression.
 
@@ -165,13 +159,13 @@ class CalculatorTool(BaseTool):
             expression: Mathematical expression to evaluate
 
         Returns:
-            ToolResult with calculated value or error
+            ToolResult[float] with calculated value or error
 
         """
         try:
             # Validate input
             if not expression or not expression.strip():
-                return ToolResult(success=False, error="Expression cannot be empty")
+                return ToolResult[float](success=False, error="Expression cannot be empty")
 
             # Parse expression into AST
             tree = ast.parse(expression, mode="eval")
@@ -180,15 +174,15 @@ class CalculatorTool(BaseTool):
             calculator = SafeCalculator()
             result = calculator.visit(tree.body)
 
-            return ToolResult(
+            return ToolResult[float](
                 success=True,
                 output=result,
                 metadata={"expression": expression, "security": "AST-based evaluation"},
             )
 
         except SyntaxError as e:
-            return ToolResult(success=False, error=f"Invalid expression syntax: {e!s}")
+            return ToolResult[float](success=False, error=f"Invalid expression syntax: {e!s}")
         except ValueError as e:
-            return ToolResult(success=False, error=str(e))
+            return ToolResult[float](success=False, error=str(e))
         except Exception as e:
-            return ToolResult(success=False, error=f"Calculation error: {e!s}")
+            return ToolResult[float](success=False, error=f"Calculation error: {e!s}")

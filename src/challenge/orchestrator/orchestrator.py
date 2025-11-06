@@ -36,13 +36,6 @@ class Orchestrator:
     Retry strategy: Exponential backoff (1s, 2s, 4s)
     Timeout: Configurable per-step timeout (default: 30s)
 
-    Example:
-        >>> orchestrator = Orchestrator(step_timeout=60.0)
-        >>> run = await orchestrator.create_run("calculate 2 + 3")
-        >>> # Wait for async execution
-        >>> assert run.status == RunStatus.COMPLETED
-        >>> assert run.result == 5.0
-
     """
 
     def __init__(
@@ -104,8 +97,8 @@ class Orchestrator:
             # Calculate planning latency
             planning_latency_ms = (time.perf_counter() - planning_start) * 1000
 
-            # Update planner metrics
-            token_count = getattr(self.planner, "last_token_count", None)
+            # Update planner metrics (type-safe property access)
+            token_count = self.planner.last_token_count
             self.metrics.record_plan(planning_latency_ms, token_count)
 
             run.plan = plan
