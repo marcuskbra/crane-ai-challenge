@@ -44,33 +44,6 @@ async def get_metrics(
     Returns:
         MetricsResponse: Typed metrics response model
 
-    Example:
-        >>> GET /api/v1/metrics
-        {
-            "timestamp": "2025-01-29T10:00:00.000Z",
-            "runs": {
-                "total": 150,
-                "by_status": {
-                    "pending": 2,
-                    "running": 1,
-                    "completed": 140,
-                    "failed": 7
-                },
-                "success_rate": 0.933
-            },
-            "execution": {
-                "avg_duration_seconds": 1.2,
-                "total_steps_executed": 450
-            },
-            "tools": {
-                "total_executions": 450,
-                "by_tool": {
-                    "calculator": 250,
-                    "todo_store": 200
-                }
-            }
-        }
-
     """
     runs = orchestrator.run_manager.list_runs()
 

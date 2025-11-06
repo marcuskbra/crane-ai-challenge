@@ -6,11 +6,6 @@ This module provides:
 - PatternBasedPlanner: Regex-based pattern matching implementation (default)
 - LLMPlanner: LLM-powered planning with structured output (requires API key)
 
-Example:
-    >>> from challenge.planner import Planner, PatternBasedPlanner
-    >>> planner: Planner = PatternBasedPlanner()
-    >>> plan = planner.create_plan("calculate 2 + 2")
-
 Security:
     - All regex patterns use length limits to prevent ReDoS attacks
     - Input validation enforces max prompt length of 2000 chars

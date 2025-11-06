@@ -374,10 +374,6 @@ def register_exception_handlers(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance
 
-    Example:
-        >>> app = FastAPI()
-        >>> register_exception_handlers(app)
-
     """
     # Custom domain exceptions
     app.add_exception_handler(RunNotFoundError, run_not_found_handler)

@@ -22,14 +22,6 @@ class RunManager:
     - Background task tracking
     - Run state management
 
-    Example:
-        >>> manager = RunManager()
-        >>> run = Run(prompt="test task")
-        >>> task = asyncio.create_task(execute_run(run.run_id))
-        >>> manager.create_run(run, task)
-        >>> retrieved = manager.get_run(run.run_id)
-        >>> assert retrieved.run_id == run.run_id
-
     """
 
     def __init__(self):

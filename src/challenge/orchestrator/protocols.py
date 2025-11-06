@@ -22,12 +22,6 @@ class ToolProvider(Protocol):
     The @runtime_checkable decorator enables isinstance() checks,
     though this is rarely needed due to Protocol's structural typing.
 
-    Example:
-        >>> class MyRegistry:
-        ...     def get(self, tool_name: str) -> BaseTool | None:
-        ...         return self._tools.get(tool_name)
-        >>> # MyRegistry is a ToolProvider (no explicit inheritance needed)
-
     """
 
     def get(self, tool_name: str) -> BaseTool | None:
@@ -39,11 +33,6 @@ class ToolProvider(Protocol):
 
         Returns:
             BaseTool instance if found, None otherwise
-
-        Example:
-            >>> tool = provider.get("calculator")
-            >>> if tool:
-            ...     result = await tool.execute(operation="add", a=2, b=3)
 
         """
         ...

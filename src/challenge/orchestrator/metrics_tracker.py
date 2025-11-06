@@ -20,12 +20,6 @@ class MetricsTracker:
     - Token usage for LLM plans
     - Planning latency
 
-    Example:
-        >>> tracker = MetricsTracker()
-        >>> tracker.record_plan(latency_ms=150.0, token_count=500)
-        >>> stats = tracker.get_stats()
-        >>> print(f"Total plans: {stats['total_plans']}")
-
     """
 
     def __init__(self):
@@ -44,13 +38,6 @@ class MetricsTracker:
             latency_ms: Planning latency in milliseconds
             token_count: Number of tokens used (LLM plans only).
                         None or 0 indicates pattern-based planning.
-
-        Example:
-            >>> # Record LLM plan
-            >>> tracker.record_plan(latency_ms=250.0, token_count=450)
-
-            >>> # Record pattern-based plan
-            >>> tracker.record_plan(latency_ms=10.0, token_count=None)
 
         """
         self.total_plans += 1
@@ -78,14 +65,6 @@ class MetricsTracker:
                 - total_tokens: Total tokens consumed by LLM
                 - total_latency_ms: Cumulative planning latency
 
-        Example:
-            >>> tracker = MetricsTracker()
-            >>> tracker.record_plan(150.0, 500)
-            >>> stats = tracker.get_stats()
-            >>> assert stats["total_plans"] == 1
-            >>> assert stats["llm_plans"] == 1
-            >>> assert stats["total_tokens"] == 500
-
         """
         return {
             "total_plans": self.total_plans,
@@ -100,12 +79,6 @@ class MetricsTracker:
         Reset all metrics to zero.
 
         Useful for testing or periodic metric resets.
-
-        Example:
-            >>> tracker = MetricsTracker()
-            >>> tracker.record_plan(100.0, 200)
-            >>> tracker.reset()
-            >>> assert tracker.total_plans == 0
 
         """
         self.total_plans = 0

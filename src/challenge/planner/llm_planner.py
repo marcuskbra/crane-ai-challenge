@@ -58,11 +58,6 @@ class LLMPlanner:
     - Cost tracking for observability (token counting)
     - Low temperature for consistency (0.1 for planning tasks)
 
-    Example:
-        >>> planner = LLMPlanner(model="gpt-4o-mini")
-        >>> plan = await planner.create_plan("calculate 2+3 and add to-do Buy milk")
-        >>> print(f"Tokens used: {planner.last_token_count}")
-
     """
 
     def __init__(
@@ -84,16 +79,6 @@ class LLMPlanner:
             fallback: Fallback planner for LLM failures (creates default if None)
             temperature: Sampling temperature (low for consistency)
             use_examples: Whether to include few-shot examples in system prompt (default: True)
-
-        Example:
-            # Use OpenAI (default)
-            planner = LLMPlanner()
-
-            # Use local LLM via LiteLLM proxy
-            planner = LLMPlanner(
-                model="qwen2.5:3b",
-                base_url="http://localhost:4000"
-            )
 
         """
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)

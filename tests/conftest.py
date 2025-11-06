@@ -232,8 +232,6 @@ def local_llm_config():
     Returns dict with base_url and model for local LLM testing.
     Set OPENAI_BASE_URL environment variable to enable local LLM.
 
-    Example:
-        OPENAI_BASE_URL=http://localhost:4000 pytest tests/
     """
     base_url = os.getenv("OPENAI_BASE_URL")
     model = os.getenv("OPENAI_MODEL", "qwen2.5:3b")
