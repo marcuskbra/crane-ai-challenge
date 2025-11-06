@@ -119,7 +119,9 @@ make run
 
 ### Frontend Dashboard (Visualization Tool)
 
-**Note:** A React-based UI dashboard is included to help visualize the agent runtime execution flow. This was created as a **visualization aid** for development and demonstration purposes - it is **not intended as a production-ready frontend** and was not part of the core assignment requirements.
+**Note:** A React-based UI dashboard is included to help visualize the agent runtime execution flow. This was created as
+a **visualization aid** for development and demonstration purposes - it is **not intended as a production-ready frontend
+** and was not part of the core assignment requirements.
 
 **Setup:**
 
@@ -144,6 +146,7 @@ make ui-dev      # Start frontend dev server
 ```
 
 **Features:**
+
 - Real-time execution monitoring with WebSocket-like polling
 - Step-by-step execution timeline visualization
 - Custom renderers for TodoStore and Calculator outputs
@@ -152,7 +155,7 @@ make ui-dev      # Start frontend dev server
 
 **Screenshots:**
 
-[TODO: Add screenshots here]
+![img.png](img.png)
 
 ### Configuration
 
@@ -187,7 +190,8 @@ STEP_TIMEOUT=30.0       # Timeout in seconds for each step execution
 
 **Timeout Configuration:**
 
-The `STEP_TIMEOUT` setting controls how long the orchestrator waits for each step to complete before timing out. This prevents steps from hanging indefinitely:
+The `STEP_TIMEOUT` setting controls how long the orchestrator waits for each step to complete before timing out. This
+prevents steps from hanging indefinitely:
 
 - **Default**: 30 seconds (suitable for most operations)
 - **Recommendation**: Increase for long-running operations (e.g., `60.0`)
@@ -240,6 +244,7 @@ docker-compose --profile dev up
 **Docker Configuration:**
 
 The Dockerfile uses multi-stage builds for:
+
 - **Smaller Images**: Builder stage separate from runtime (~200MB final image)
 - **Security**: Non-root user execution
 - **Performance**: UV package manager for fast builds
@@ -252,6 +257,7 @@ All configuration options from `.env.example` are supported as environment varia
 **Resource Limits:**
 
 Default limits in docker-compose.yml:
+
 - CPU: 1.0 core (0.5 reserved)
 - Memory: 512MB (256MB reserved)
 
@@ -261,17 +267,18 @@ Adjust in `docker-compose.yml` based on workload.
 
 ## 🧪 Local LLM Testing
 
-Test your AI agent runtime with **local lightweight LLMs** instead of OpenAI - zero API costs, faster iteration, and offline development capability.
+Test your AI agent runtime with **local lightweight LLMs** instead of OpenAI - zero API costs, faster iteration, and
+offline development capability.
 
 ### Why Local LLMs for Testing?
 
-| Benefit | Impact |
-|---------|---------|
-| ✅ **Zero API costs** | No charges for development/CI testing |
-| ✅ **Faster iteration** | <100ms latency vs 500-1500ms |
-| ✅ **Offline development** | Work without internet connectivity |
-| ✅ **CI/CD friendly** | Reproducible containerized tests |
-| ✅ **Easy switching** | Toggle between local/OpenAI via env vars |
+| Benefit                   | Impact                                   |
+|---------------------------|------------------------------------------|
+| ✅ **Zero API costs**      | No charges for development/CI testing    |
+| ✅ **Faster iteration**    | <100ms latency vs 500-1500ms             |
+| ✅ **Offline development** | Work without internet connectivity       |
+| ✅ **CI/CD friendly**      | Reproducible containerized tests         |
+| ✅ **Easy switching**      | Toggle between local/OpenAI via env vars |
 
 ### Quick Start
 
@@ -311,11 +318,11 @@ pytest tests/ -v
 
 ### Model Recommendations
 
-| Model | Size | Speed | Accuracy | Use Case |
-|-------|------|-------|----------|----------|
-| **qwen2.5:3b** ⭐ | 2.3GB | ⚡⚡⚡ Fast | 97% vs GPT-4o-mini | **Primary choice** |
-| phi3:mini | 2.4GB | ⚡⚡⚡ Fast | 97% vs GPT-4o-mini | Alternative |
-| qwen2.5:1.5b | 1.2GB | ⚡⚡⚡⚡ Very fast | 91% vs GPT-4o-mini | Resource-constrained |
+| Model            | Size  | Speed          | Accuracy           | Use Case             |
+|------------------|-------|----------------|--------------------|----------------------|
+| **qwen2.5:3b** ⭐ | 2.3GB | ⚡⚡⚡ Fast       | 97% vs GPT-4o-mini | **Primary choice**   |
+| phi3:mini        | 2.4GB | ⚡⚡⚡ Fast       | 97% vs GPT-4o-mini | Alternative          |
+| qwen2.5:1.5b     | 1.2GB | ⚡⚡⚡⚡ Very fast | 91% vs GPT-4o-mini | Resource-constrained |
 
 ### Configuration
 
@@ -348,12 +355,12 @@ docker-compose -f docker-compose.litellm.yml logs -f litellm
 
 ### Performance Comparison
 
-| Metric | GPT-4o-mini | Qwen2.5-3B (Local) |
-|--------|-------------|-------------------|
-| Planning time | 1-2s | 2-3s |
-| Cost per 1K runs | $0.30 | $0 |
-| Accuracy | 99% | 97% |
-| Offline capable | ❌ | ✅ |
+| Metric           | GPT-4o-mini | Qwen2.5-3B (Local) |
+|------------------|-------------|--------------------|
+| Planning time    | 1-2s        | 2-3s               |
+| Cost per 1K runs | $0.30       | $0                 |
+| Accuracy         | 99%         | 97%                |
+| Offline capable  | ❌           | ✅                  |
 
 ### Complete Guide
 
@@ -620,6 +627,7 @@ curl http://localhost:8000/api/v1/metrics
 ```
 
 **Use Cases:**
+
 - Monitor system health and performance
 - Track success rates and failure patterns
 - Identify most-used tools for optimization
@@ -1010,12 +1018,12 @@ test_max_retries_exceeded()  # Validates failure after 3 attempts
 
 ## 📊 Evaluation Criteria Alignment
 
-| Criterion                 | Weight | How This Project Addresses It                                                                                                                       |
-|---------------------------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Code Quality**          | 40%    | • Type hints throughout<br>• 83% test coverage<br>• Security-first (AST calculator)<br>• Clear error handling<br>• Consistent patterns              |
-| **Architecture & Design** | 30%    | • Clean 4-layer separation<br>• Dependency injection<br>• Extensible tool interface<br>• SOLID principles<br>• Thoughtful trade-offs documented     |
+| Criterion                 | Weight | How This Project Addresses It                                                                                                                         |
+|---------------------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Code Quality**          | 40%    | • Type hints throughout<br>• 83% test coverage<br>• Security-first (AST calculator)<br>• Clear error handling<br>• Consistent patterns                |
+| **Architecture & Design** | 30%    | • Clean 4-layer separation<br>• Dependency injection<br>• Extensible tool interface<br>• SOLID principles<br>• Thoughtful trade-offs documented       |
 | **Functionality**         | 20%    | • All requirements met<br>• Calculator + TodoStore working<br>• Planner + Orchestrator complete<br>• Retry logic implemented<br>• 83/83 tests passing |
-| **Documentation**         | 10%    | • This comprehensive README<br>• Concrete examples with outputs<br>• Architecture diagram<br>• Honest limitations<br>• Realistic improvements       |
+| **Documentation**         | 10%    | • This comprehensive README<br>• Concrete examples with outputs<br>• Architecture diagram<br>• Honest limitations<br>• Realistic improvements         |
 
 **Estimated Score:** 75-85% (Tier 2 Target ✅)
 
