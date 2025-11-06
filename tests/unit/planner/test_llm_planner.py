@@ -155,12 +155,12 @@ async def test_cost_tracking(mock_openai):
     planner = LLMPlanner()
     await planner.create_plan("calculate 1+1")
 
-    # Check cost estimate
+    # Check cost estimate (now returns CostEstimate model)
     cost_info = planner.get_cost_estimate()
-    assert cost_info["tokens"] == 200
-    assert cost_info["model"] == "gpt-4o-mini"
-    assert cost_info["estimated_cost_usd"] > 0
-    assert cost_info["cost_per_1k_tokens"] == 0.00015
+    assert cost_info.tokens == 200
+    assert cost_info.model == "gpt-4o-mini"
+    assert cost_info.estimated_cost_usd > 0
+    assert cost_info.cost_per_1k_tokens == 0.00015
 
 
 @pytest.mark.asyncio

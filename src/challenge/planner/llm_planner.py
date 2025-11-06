@@ -9,9 +9,9 @@ Includes few-shot prompt engineering for improved consistency and error handling
 
 import json
 import logging
-from typing import Any
 
 from openai import AsyncOpenAI
+from pydantic import BaseModel, ConfigDict, Field
 
 from challenge.models.plan import Plan
 from challenge.planner.examples import ALL_EXAMPLES, format_example_for_prompt
@@ -46,6 +46,25 @@ PLAN_SCHEMA = {
         "additionalProperties": False,
     },
 }
+
+
+class CostEstimate(BaseModel):
+    """
+    Cost estimate for LLM operation.
+
+    Provides token usage and cost information for monitoring and optimization.
+    """
+
+    tokens: int = Field(..., ge=0, description="Total tokens used in operation")
+    model: str = Field(..., min_length=1, description="Model name used for operation")
+    estimated_cost_usd: float = Field(..., ge=0.0, description="Estimated cost in USD")
+    cost_per_1k_tokens: float = Field(..., ge=0.0, description="Cost per 1K tokens in USD")
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        strict=True,
+        extra="forbid",
+    )
 
 
 class LLMPlanner:
@@ -203,21 +222,21 @@ IMPORTANT: Always use curly braces {} for variable references, never angle brack
 
         return base_prompt
 
-    def get_cost_estimate(self) -> dict[str, Any]:
+    def get_cost_estimate(self) -> CostEstimate:
         """
         Get cost estimate for last LLM call.
 
         Returns:
-            Dict with token count and estimated cost
+            Typed cost estimate with token count and pricing information
 
         """
         # GPT-4o-mini pricing (as of 2024)
         cost_per_1k_tokens = 0.00015  # $0.15 per 1M tokens
         estimated_cost = (self.last_token_count / 1000) * cost_per_1k_tokens
 
-        return {
-            "tokens": self.last_token_count,
-            "model": self.model,
-            "estimated_cost_usd": estimated_cost,
-            "cost_per_1k_tokens": cost_per_1k_tokens,
-        }
+        return CostEstimate(
+            tokens=self.last_token_count,
+            model=self.model,
+            estimated_cost_usd=estimated_cost,
+            cost_per_1k_tokens=cost_per_1k_tokens,
+        )

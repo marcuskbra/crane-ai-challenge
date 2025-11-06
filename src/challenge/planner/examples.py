@@ -10,11 +10,23 @@ Pattern Categories:
 - Complex: Coordinated multi-tool operations with dependencies
 """
 
-from typing import Literal
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from challenge.models.plan import Plan, PlanStep
+
+
+class ExampleComplexity(str, Enum):
+    """
+    Task complexity levels for few-shot examples.
+
+    Used to categorize examples by difficulty for adaptive prompt engineering.
+    """
+
+    SIMPLE = "simple"
+    MODERATE = "moderate"
+    COMPLEX = "complex"
 
 
 class FewShotExample(BaseModel):
@@ -32,7 +44,7 @@ class FewShotExample(BaseModel):
     prompt: str = Field(..., min_length=1, description="Natural language task")
     reasoning: str = Field(..., min_length=1, description="Chain-of-thought reasoning")
     plan: Plan = Field(..., description="Structured execution plan")
-    complexity: Literal["simple", "moderate", "complex"] = Field(..., description="Task complexity level")
+    complexity: ExampleComplexity = Field(..., description="Task complexity level")
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -62,7 +74,7 @@ EXAMPLE_SIMPLE_CALCULATION = FewShotExample(
         ],
         final_goal="Calculate the result of (10 + 5) * 2",
     ),
-    complexity="simple",
+    complexity=ExampleComplexity.SIMPLE,
 )
 
 # Example 2: Todo CRUD operations
@@ -91,7 +103,7 @@ EXAMPLE_TODO_WORKFLOW = FewShotExample(
         ],
         final_goal="Add todo to buy milk and display all tasks",
     ),
-    complexity="moderate",
+    complexity=ExampleComplexity.MODERATE,
 )
 
 # Example 3: Multi-step with calculation + todo using variable resolution
@@ -120,7 +132,7 @@ EXAMPLE_CALCULATION_THEN_TODO = FewShotExample(
         ],
         final_goal="Calculate 3 * 4 and store result as todo",
     ),
-    complexity="complex",
+    complexity=ExampleComplexity.COMPLEX,
 )
 
 # Example 4: Complex multi-todo workflow
@@ -156,7 +168,7 @@ EXAMPLE_MULTI_TODO_OPERATIONS = FewShotExample(
         ],
         final_goal="Add multiple todos and display complete task list",
     ),
-    complexity="complex",
+    complexity=ExampleComplexity.COMPLEX,
 )
 
 # Example 5: Edge case - simple list operation
@@ -179,7 +191,7 @@ EXAMPLE_SIMPLE_LIST = FewShotExample(
         ],
         final_goal="Display all todo items",
     ),
-    complexity="simple",
+    complexity=ExampleComplexity.SIMPLE,
 )
 
 # Example 6: Variable resolution - complete first todo
@@ -208,7 +220,7 @@ EXAMPLE_COMPLETE_FIRST_TODO = FewShotExample(
         ],
         final_goal="List todos and complete the first one",
     ),
-    complexity="complex",
+    complexity=ExampleComplexity.COMPLEX,
 )
 
 # Example 7: Variable resolution - delete last todo
@@ -237,7 +249,7 @@ EXAMPLE_DELETE_LAST_TODO = FewShotExample(
         ],
         final_goal="Display todos and delete the last one",
     ),
-    complexity="complex",
+    complexity=ExampleComplexity.COMPLEX,
 )
 
 # Example 8: Chained calculator operations with variable resolution
@@ -273,7 +285,7 @@ EXAMPLE_CHAINED_CALCULATIONS = FewShotExample(
         ],
         final_goal="Perform chained calculations and store final result as todo",
     ),
-    complexity="complex",
+    complexity=ExampleComplexity.COMPLEX,
 )
 
 
@@ -290,7 +302,7 @@ ALL_EXAMPLES: list[FewShotExample] = [
 ]
 
 
-def get_examples_by_complexity(complexity: Literal["simple", "moderate", "complex"]) -> list[FewShotExample]:
+def get_examples_by_complexity(complexity: ExampleComplexity) -> list[FewShotExample]:
     """
     Filter examples by complexity level.
 

@@ -20,6 +20,7 @@ from challenge.planner.examples import (
     EXAMPLE_SIMPLE_CALCULATION,
     EXAMPLE_SIMPLE_LIST,
     EXAMPLE_TODO_WORKFLOW,
+    ExampleComplexity,
     FewShotExample,
     format_example_for_prompt,
     get_examples_by_complexity,
@@ -48,13 +49,13 @@ class TestFewShotExample:
             prompt="calculate 2 + 2",
             reasoning="Simple arithmetic",
             plan=plan,
-            complexity="simple",
+            complexity=ExampleComplexity.SIMPLE,
         )
 
         assert example.prompt == "calculate 2 + 2"
         assert example.reasoning == "Simple arithmetic"
         assert example.plan == plan
-        assert example.complexity == "simple"
+        assert example.complexity == ExampleComplexity.SIMPLE
 
     def test_few_shot_example_invalid_complexity(self):
         """Test that invalid complexity level raises ValidationError."""
@@ -102,7 +103,7 @@ class TestFewShotExample:
                 prompt="",  # Empty string
                 reasoning="Simple arithmetic",
                 plan=plan,
-                complexity="simple",
+                complexity=ExampleComplexity.SIMPLE,
             )
 
         assert "prompt" in str(exc_info.value)
@@ -151,7 +152,11 @@ class TestExampleCollection:
             assert len(example.reasoning) > 0
             assert isinstance(example.plan, Plan)
             assert len(example.plan.steps) > 0
-            assert example.complexity in ["simple", "moderate", "complex"]
+            assert example.complexity in [
+                ExampleComplexity.SIMPLE,
+                ExampleComplexity.MODERATE,
+                ExampleComplexity.COMPLEX,
+            ]
 
     def test_all_examples_have_unique_prompts(self):
         """Test that all examples have unique prompts."""
@@ -161,9 +166,9 @@ class TestExampleCollection:
     def test_example_complexity_distribution(self):
         """Test that we have examples across all complexity levels."""
         complexities = {ex.complexity for ex in ALL_EXAMPLES}
-        assert "simple" in complexities
-        assert "moderate" in complexities
-        assert "complex" in complexities
+        assert ExampleComplexity.SIMPLE in complexities
+        assert ExampleComplexity.MODERATE in complexities
+        assert ExampleComplexity.COMPLEX in complexities
 
     def test_predefined_examples_exist(self):
         """Test that all predefined example constants are accessible."""
@@ -175,19 +180,19 @@ class TestExampleCollection:
 
     def test_example_simple_calculation_structure(self):
         """Test specific structure of simple calculation example."""
-        assert EXAMPLE_SIMPLE_CALCULATION.complexity == "simple"
+        assert EXAMPLE_SIMPLE_CALCULATION.complexity == ExampleComplexity.SIMPLE
         assert len(EXAMPLE_SIMPLE_CALCULATION.plan.steps) == 1
         assert EXAMPLE_SIMPLE_CALCULATION.plan.steps[0].tool_name == "calculator"
 
     def test_example_todo_workflow_structure(self):
         """Test specific structure of todo workflow example."""
-        assert EXAMPLE_TODO_WORKFLOW.complexity == "moderate"
+        assert EXAMPLE_TODO_WORKFLOW.complexity == ExampleComplexity.MODERATE
         assert len(EXAMPLE_TODO_WORKFLOW.plan.steps) == 2
         assert all(step.tool_name == "todo_store" for step in EXAMPLE_TODO_WORKFLOW.plan.steps)
 
     def test_example_complex_operations_structure(self):
         """Test specific structure of complex operations example."""
-        assert EXAMPLE_MULTI_TODO_OPERATIONS.complexity == "complex"
+        assert EXAMPLE_MULTI_TODO_OPERATIONS.complexity == ExampleComplexity.COMPLEX
         assert len(EXAMPLE_MULTI_TODO_OPERATIONS.plan.steps) == 3
         assert all(step.tool_name == "todo_store" for step in EXAMPLE_MULTI_TODO_OPERATIONS.plan.steps)
 
@@ -197,27 +202,27 @@ class TestComplexityFiltering:
 
     def test_get_simple_examples(self):
         """Test filtering simple examples."""
-        simple_examples = get_examples_by_complexity("simple")
+        simple_examples = get_examples_by_complexity(ExampleComplexity.SIMPLE)
         assert len(simple_examples) >= 1
-        assert all(ex.complexity == "simple" for ex in simple_examples)
+        assert all(ex.complexity == ExampleComplexity.SIMPLE for ex in simple_examples)
 
     def test_get_moderate_examples(self):
         """Test filtering moderate examples."""
-        moderate_examples = get_examples_by_complexity("moderate")
+        moderate_examples = get_examples_by_complexity(ExampleComplexity.MODERATE)
         assert len(moderate_examples) >= 1
-        assert all(ex.complexity == "moderate" for ex in moderate_examples)
+        assert all(ex.complexity == ExampleComplexity.MODERATE for ex in moderate_examples)
 
     def test_get_complex_examples(self):
         """Test filtering complex examples."""
-        complex_examples = get_examples_by_complexity("complex")
+        complex_examples = get_examples_by_complexity(ExampleComplexity.COMPLEX)
         assert len(complex_examples) >= 1
-        assert all(ex.complexity == "complex" for ex in complex_examples)
+        assert all(ex.complexity == ExampleComplexity.COMPLEX for ex in complex_examples)
 
     def test_filtering_returns_subset(self):
         """Test that filtered results are subsets of ALL_EXAMPLES."""
-        simple = get_examples_by_complexity("simple")
-        moderate = get_examples_by_complexity("moderate")
-        complex_ex = get_examples_by_complexity("complex")
+        simple = get_examples_by_complexity(ExampleComplexity.SIMPLE)
+        moderate = get_examples_by_complexity(ExampleComplexity.MODERATE)
+        complex_ex = get_examples_by_complexity(ExampleComplexity.COMPLEX)
 
         total_filtered = len(simple) + len(moderate) + len(complex_ex)
         assert total_filtered == len(ALL_EXAMPLES)
