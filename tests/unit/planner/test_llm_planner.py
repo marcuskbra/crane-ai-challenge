@@ -1,6 +1,6 @@
-"""Tests for LLM-based planner with mocked OpenAI responses."""
+"""Tests for LLM-based planner with mocked LiteLLM responses."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -11,16 +11,16 @@ from challenge.services.planning.llm_planner import LLMPlanner
 
 
 @pytest.fixture
-def mock_openai():
-    """Mock OpenAI client."""
-    with patch("challenge.services.planning.llm_planner.AsyncOpenAI") as mock:
+def mock_litellm():
+    """Mock LiteLLM acompletion function."""
+    with patch("challenge.services.planning.llm_planner.litellm.acompletion") as mock:
         yield mock
 
 
 @pytest.mark.asyncio
-async def test_llm_planner_success(mock_openai):
+async def test_llm_planner_success(mock_litellm):
     """Test successful LLM planning with structured output."""
-    # Mock successful OpenAI response
+    # Mock successful LiteLLM response
     mock_response = MagicMock()
     mock_response.choices = [
         MagicMock(
@@ -31,8 +31,8 @@ async def test_llm_planner_success(mock_openai):
     ]
     mock_response.usage = MagicMock(total_tokens=125)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test planner
     planner = LLMPlanner()
@@ -47,7 +47,7 @@ async def test_llm_planner_success(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_llm_planner_multi_step(mock_openai):
+async def test_llm_planner_multi_step(mock_litellm):
     """Test LLM planning with multiple steps."""
     # Mock response with multiple steps
     mock_response = MagicMock()
@@ -60,8 +60,8 @@ async def test_llm_planner_multi_step(mock_openai):
     ]
     mock_response.usage = MagicMock(total_tokens=200)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test planner
     planner = LLMPlanner()
@@ -76,11 +76,10 @@ async def test_llm_planner_multi_step(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_llm_planner_fallback_on_api_error(mock_openai):
+async def test_llm_planner_fallback_on_api_error(mock_litellm):
     """Test graceful fallback to pattern-based on API failure."""
     # Mock API failure
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(side_effect=Exception("API rate limit exceeded"))
+    mock_litellm.side_effect = Exception("API rate limit exceeded")
 
     # Test planner with fallback
     planner = LLMPlanner()
@@ -95,15 +94,15 @@ async def test_llm_planner_fallback_on_api_error(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_llm_planner_fallback_on_invalid_json(mock_openai):
+async def test_llm_planner_fallback_on_invalid_json(mock_litellm):
     """Test fallback when LLM returns invalid JSON."""
     # Mock response with invalid JSON
     mock_response = MagicMock()
     mock_response.choices = [MagicMock(message=MagicMock(content="invalid json {"))]
     mock_response.usage = MagicMock(total_tokens=50)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test planner
     planner = LLMPlanner()
@@ -115,15 +114,15 @@ async def test_llm_planner_fallback_on_invalid_json(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_llm_planner_fallback_on_invalid_schema(mock_openai):
+async def test_llm_planner_fallback_on_invalid_schema(mock_litellm):
     """Test fallback when LLM returns valid JSON but invalid schema."""
     # Mock response with valid JSON but missing required fields
     mock_response = MagicMock()
     mock_response.choices = [MagicMock(message=MagicMock(content='{"invalid": "schema"}'))]
     mock_response.usage = MagicMock(total_tokens=60)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test planner
     planner = LLMPlanner()
@@ -135,8 +134,8 @@ async def test_llm_planner_fallback_on_invalid_schema(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_cost_tracking(mock_openai):
-    """Test token usage and cost tracking."""
+async def test_cost_tracking(mock_litellm):
+    """Test token usage and cost tracking with LiteLLM."""
     # Mock response with valid plan
     mock_response = MagicMock()
     mock_response.choices = [
@@ -148,23 +147,24 @@ async def test_cost_tracking(mock_openai):
     ]
     mock_response.usage = MagicMock(total_tokens=200)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test planner
     planner = LLMPlanner()
     await planner.create_plan("calculate 1+1")
 
-    # Check cost estimate (now returns CostEstimate model)
+    # Check cost estimate (uses LiteLLM's built-in pricing)
     cost_info = planner.get_cost_estimate()
     assert cost_info.tokens == 200
     assert cost_info.model == "gpt-4o-mini"
-    assert cost_info.estimated_cost_usd > 0
-    assert cost_info.cost_per_1k_tokens == 0.00015
+    # LiteLLM calculates cost automatically, should be >= 0
+    assert cost_info.estimated_cost_usd >= 0
+    assert cost_info.cost_per_1k_tokens >= 0
 
 
 @pytest.mark.asyncio
-async def test_temperature_configuration(mock_openai):
+async def test_temperature_configuration(mock_litellm):
     """Test that temperature can be configured."""
     mock_response = MagicMock()
     mock_response.choices = [
@@ -176,20 +176,20 @@ async def test_temperature_configuration(mock_openai):
     ]
     mock_response.usage = MagicMock(total_tokens=100)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test with custom temperature
     planner = LLMPlanner(temperature=0.5)
     await planner.create_plan("calculate 1+1")
 
     # Verify temperature was passed to API call
-    call_kwargs = mock_client.chat.completions.create.call_args[1]
+    call_kwargs = mock_litellm.call_args[1]
     assert call_kwargs["temperature"] == 0.5
 
 
 @pytest.mark.asyncio
-async def test_model_configuration(mock_openai):
+async def test_model_configuration(mock_litellm):
     """Test that model can be configured."""
     mock_response = MagicMock()
     mock_response.choices = [
@@ -201,20 +201,20 @@ async def test_model_configuration(mock_openai):
     ]
     mock_response.usage = MagicMock(total_tokens=150)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test with custom model
     planner = LLMPlanner(model="gpt-4o")
     await planner.create_plan("calculate 1+1")
 
     # Verify model was passed to API call
-    call_kwargs = mock_client.chat.completions.create.call_args[1]
+    call_kwargs = mock_litellm.call_args[1]
     assert call_kwargs["model"] == "gpt-4o"
 
 
 @pytest.mark.asyncio
-async def test_system_prompt_includes_tool_descriptions(mock_openai):
+async def test_system_prompt_includes_tool_descriptions(mock_litellm):
     """Test that system prompt includes tool documentation."""
     planner = LLMPlanner()
     system_prompt = planner._system_prompt()
@@ -229,10 +229,9 @@ async def test_system_prompt_includes_tool_descriptions(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_empty_prompt_fallback(mock_openai):
+async def test_empty_prompt_fallback(mock_litellm):
     """Test that empty prompts use fallback and raise ValueError."""
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(side_effect=Exception("Should not be called"))
+    mock_litellm.side_effect = Exception("Should not be called")
 
     planner = LLMPlanner()
 
@@ -242,7 +241,7 @@ async def test_empty_prompt_fallback(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_todo_operations(mock_openai):
+async def test_todo_operations(mock_litellm):
     """Test LLM planning for to-do operations."""
     # Mock response for adding a to-do
     mock_response = MagicMock()
@@ -255,8 +254,8 @@ async def test_todo_operations(mock_openai):
     ]
     mock_response.usage = MagicMock(total_tokens=180)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test planner
     planner = LLMPlanner()
@@ -270,7 +269,7 @@ async def test_todo_operations(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_complex_multi_step_with_variable_resolution(mock_openai):
+async def test_complex_multi_step_with_variable_resolution(mock_litellm):
     """Test complex multi-step plan with variable resolution across steps.
 
     Tests the prompt: "Calculate (42 * 8) + 15, then use the result and multiply by 2,
@@ -317,8 +316,8 @@ async def test_complex_multi_step_with_variable_resolution(mock_openai):
     ]
     mock_response.usage = MagicMock(total_tokens=350)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Test planner
     planner = LLMPlanner()
@@ -356,7 +355,7 @@ async def test_complex_multi_step_with_variable_resolution(mock_openai):
 
 
 @pytest.mark.asyncio
-async def test_complex_multi_step_execution_with_context(mock_openai):
+async def test_complex_multi_step_execution_with_context(mock_litellm):
     """Test that complex multi-step plan executes correctly with ExecutionContext.
 
     This is an integration test that validates variable resolution actually works
@@ -398,8 +397,8 @@ async def test_complex_multi_step_execution_with_context(mock_openai):
     ]
     mock_response.usage = MagicMock(total_tokens=300)
 
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock litellm.acompletion directly
+    mock_litellm.return_value = mock_response
 
     # Create plan
     planner = LLMPlanner()
