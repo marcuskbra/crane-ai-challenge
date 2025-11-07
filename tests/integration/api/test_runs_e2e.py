@@ -13,7 +13,7 @@ class TestRunsE2E:
     """End-to-end integration tests for runs API."""
 
     @pytest.mark.asyncio
-    async def test_calculator_run_complete_flow(self, test_client):
+    async def test_calculator_run_complete_flow(self, test_client, wait_for_run_completion):
         """Test complete calculator flow from API to execution."""
         # Create run
         response = test_client.post(
@@ -30,14 +30,9 @@ class TestRunsE2E:
 
         run_id = data["run_id"]
 
-        # Wait for execution to complete
-        await asyncio.sleep(0.5)
+        # Wait for execution to complete (polling is much faster than fixed sleep)
+        data = await wait_for_run_completion(test_client, run_id)
 
-        # Get run status
-        response = test_client.get(f"/api/v1/runs/{run_id}")
-        assert response.status_code == 200
-
-        data = response.json()
         assert data["status"] == "completed"
         assert data["result"] == 40.0
         assert len(data["execution_log"]) == 1
@@ -45,7 +40,7 @@ class TestRunsE2E:
         assert data["execution_log"][0]["output"] == 40.0
 
     @pytest.mark.asyncio
-    async def test_todo_add_and_list_flow(self, test_client):
+    async def test_todo_add_and_list_flow(self, test_client, wait_for_run_completion):
         """Test todo add and list flow."""
         # Create run to add todo
         response = test_client.post(
@@ -56,14 +51,9 @@ class TestRunsE2E:
         assert response.status_code == 201
         run1_id = response.json()["run_id"]
 
-        # Wait for execution
-        await asyncio.sleep(0.5)
+        # Wait for execution (polling)
+        data = await wait_for_run_completion(test_client, run1_id)
 
-        # Verify todo was added
-        response = test_client.get(f"/api/v1/runs/{run1_id}")
-        assert response.status_code == 200
-
-        data = response.json()
         assert data["status"] == "completed"
         assert data["result"]["todo"]["text"] == "write tests"  # Planner converts to lowercase
         assert data["result"]["todo"]["completed"] is False
@@ -77,14 +67,9 @@ class TestRunsE2E:
         assert response.status_code == 201
         run2_id = response.json()["run_id"]
 
-        # Wait for execution
-        await asyncio.sleep(0.5)
+        # Wait for execution (polling)
+        data = await wait_for_run_completion(test_client, run2_id)
 
-        # Verify list contains the todo
-        response = test_client.get(f"/api/v1/runs/{run2_id}")
-        assert response.status_code == 200
-
-        data = response.json()
         assert data["status"] == "completed"
         assert isinstance(data["result"]["todos"], list)
         assert len(data["result"]["todos"]) >= 1
@@ -92,7 +77,7 @@ class TestRunsE2E:
         assert any(t["text"] == "write tests" for t in data["result"]["todos"])
 
     @pytest.mark.asyncio
-    async def test_multi_step_run(self, test_client):
+    async def test_multi_step_run(self, test_client, wait_for_run_completion):
         """Test multi-step run with 'and' operator."""
         response = test_client.post(
             "/api/v1/runs",
@@ -108,14 +93,9 @@ class TestRunsE2E:
         assert data["plan"]["steps"][0]["tool_input"]["expression"] == "10 + 5"
         assert data["plan"]["steps"][1]["tool_input"]["expression"] == "20 / 4"
 
-        # Wait for execution
-        await asyncio.sleep(0.5)
+        # Wait for execution (polling)
+        data = await wait_for_run_completion(test_client, run_id)
 
-        # Get final result
-        response = test_client.get(f"/api/v1/runs/{run_id}")
-        assert response.status_code == 200
-
-        data = response.json()
         assert data["status"] == "completed"
         assert len(data["execution_log"]) == 2
         assert data["execution_log"][0]["output"] == 15.0
@@ -123,7 +103,7 @@ class TestRunsE2E:
         assert data["result"] == 5.0  # Result of last step
 
     @pytest.mark.asyncio
-    async def test_complex_multi_step_workflow(self, test_client):
+    async def test_complex_multi_step_workflow(self, test_client, wait_for_run_completion):
         """Test complex workflow with calculator and todos."""
         response = test_client.post(
             "/api/v1/runs",
@@ -142,14 +122,9 @@ class TestRunsE2E:
         assert data["plan"]["steps"][2]["tool_name"] == "todo_store"
         assert data["plan"]["steps"][2]["tool_input"]["action"] == "list"
 
-        # Wait for execution
-        await asyncio.sleep(0.5)
+        # Wait for execution (polling)
+        data = await wait_for_run_completion(test_client, run_id)
 
-        # Verify execution
-        response = test_client.get(f"/api/v1/runs/{run_id}")
-        assert response.status_code == 200
-
-        data = response.json()
         assert data["status"] == "completed"
         assert len(data["execution_log"]) == 3
         assert data["execution_log"][0]["success"] is True  # calc
@@ -157,7 +132,7 @@ class TestRunsE2E:
         assert data["execution_log"][2]["success"] is True  # list
 
     @pytest.mark.asyncio
-    async def test_invalid_prompt(self, test_client):
+    async def test_invalid_prompt(self, test_client, wait_for_run_completion):
         """Test error handling for invalid prompt."""
         response = test_client.post(
             "/api/v1/runs",
@@ -166,15 +141,11 @@ class TestRunsE2E:
 
         assert response.status_code == 201  # Run created
         data = response.json()
+        run_id = data["run_id"]
 
-        # Wait for planning
-        await asyncio.sleep(0.2)
+        # Wait for planning to fail (polling handles failed status too)
+        data = await wait_for_run_completion(test_client, run_id)
 
-        # Should have failed planning
-        response = test_client.get(f"/api/v1/runs/{data['run_id']}")
-        assert response.status_code == 200
-
-        data = response.json()
         assert data["status"] == "failed"
         assert "could not parse" in data["error"].lower()
 
@@ -196,7 +167,7 @@ class TestRunsE2E:
         assert "not found" in response.json()["detail"].lower()
 
     @pytest.mark.asyncio
-    async def test_run_isolation(self, test_client):
+    async def test_run_isolation(self, test_client, wait_for_run_completion):
         """Test that runs are isolated and don't interfere."""
         # Create two independent runs
         response1 = test_client.post(
@@ -215,18 +186,16 @@ class TestRunsE2E:
         run2_id = response2.json()["run_id"]
         assert run1_id != run2_id
 
-        # Wait for execution
-        await asyncio.sleep(0.5)
+        # Wait for both runs (polling) - can wait in parallel
+        data1, data2 = await asyncio.gather(
+            wait_for_run_completion(test_client, run1_id), wait_for_run_completion(test_client, run2_id)
+        )
 
-        # Verify both completed correctly
-        response1 = test_client.get(f"/api/v1/runs/{run1_id}")
-        response2 = test_client.get(f"/api/v1/runs/{run2_id}")
-
-        assert response1.json()["result"] == 2.0
-        assert response2.json()["result"] == 4.0
+        assert data1["result"] == 2.0
+        assert data2["result"] == 4.0
 
     @pytest.mark.asyncio
-    async def test_list_runs_default_pagination(self, test_client):
+    async def test_list_runs_default_pagination(self, test_client, wait_for_run_completion):
         """Test listing runs with default pagination."""
         # Create multiple runs
         run_ids = []
@@ -238,8 +207,8 @@ class TestRunsE2E:
             assert response.status_code == 201
             run_ids.append(response.json()["run_id"])
 
-        # Wait for some execution
-        await asyncio.sleep(0.3)
+        # Wait for at least first run to ensure runs are created (polling)
+        await wait_for_run_completion(test_client, run_ids[0])
 
         # List runs (default: limit=10, offset=0)
         response = test_client.get("/api/v1/runs")
@@ -255,17 +224,20 @@ class TestRunsE2E:
         assert run_ids[-1] in returned_ids[:5]  # Most recent should be in first 5
 
     @pytest.mark.asyncio
-    async def test_list_runs_with_limit(self, test_client):
+    async def test_list_runs_with_limit(self, test_client, wait_for_run_completion):
         """Test listing runs with custom limit."""
         # Create multiple runs
+        run_ids = []
         for i in range(5):
             response = test_client.post(
                 "/api/v1/runs",
                 json={"prompt": f"calculate {i} + 2"},
             )
             assert response.status_code == 201
+            run_ids.append(response.json()["run_id"])
 
-        await asyncio.sleep(0.3)
+        # Wait for at least first run (polling)
+        await wait_for_run_completion(test_client, run_ids[0])
 
         # List with limit=2
         response = test_client.get("/api/v1/runs?limit=2")
@@ -276,7 +248,7 @@ class TestRunsE2E:
         assert len(data) <= 2
 
     @pytest.mark.asyncio
-    async def test_list_runs_with_offset(self, test_client):
+    async def test_list_runs_with_offset(self, test_client, wait_for_run_completion):
         """Test listing runs with offset."""
         # Create multiple runs
         run_ids = []
@@ -288,7 +260,8 @@ class TestRunsE2E:
             assert response.status_code == 201
             run_ids.append(response.json()["run_id"])
 
-        await asyncio.sleep(0.3)
+        # Wait for at least first run (polling)
+        await wait_for_run_completion(test_client, run_ids[0])
 
         # Get first page
         response1 = test_client.get("/api/v1/runs?limit=2&offset=0")
@@ -324,9 +297,9 @@ class TestRunsE2E:
         assert "offset" in response.json()["detail"].lower()
 
     @pytest.mark.asyncio
-    async def test_list_runs_reverse_chronological(self, test_client):
+    async def test_list_runs_reverse_chronological(self, test_client, wait_for_run_completion):
         """Test that runs are listed in reverse chronological order."""
-        # Create runs with small delays to ensure order
+        # Create runs sequentially to ensure order
         run_ids = []
         for i in range(3):
             response = test_client.post(
@@ -334,8 +307,10 @@ class TestRunsE2E:
                 json={"prompt": f"calculate {i} + 10"},
             )
             assert response.status_code == 201
-            run_ids.append(response.json()["run_id"])
-            await asyncio.sleep(0.1)  # Small delay between creations
+            run_id = response.json()["run_id"]
+            run_ids.append(run_id)
+            # Wait for each run to complete to ensure clear temporal ordering
+            await wait_for_run_completion(test_client, run_id)
 
         # List runs
         response = test_client.get("/api/v1/runs?limit=3")
