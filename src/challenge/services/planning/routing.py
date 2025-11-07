@@ -6,8 +6,9 @@ cost optimization, and provider availability with automatic fallback chains.
 """
 
 import logging
-from dataclasses import dataclass
 from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +21,7 @@ class PromptComplexity(str, Enum):
     COMPLEX = "complex"  # Long prompts, advanced reasoning (>300 tokens)
 
 
-@dataclass
-class ModelConfig:
+class ModelConfig(BaseModel):
     """
     Configuration for a specific model.
 
@@ -35,12 +35,19 @@ class ModelConfig:
 
     """
 
-    name: str
-    provider: str
-    max_tokens: int
-    cost_per_1k_tokens: float
-    supports_json_schema: bool = True
-    is_local: bool = False
+    name: str = Field(..., description="Model identifier")
+    provider: str = Field(..., description="Provider name (openai, anthropic, ollama)")
+    max_tokens: int = Field(..., gt=0, description="Maximum token capacity")
+    cost_per_1k_tokens: float = Field(..., ge=0.0, description="Cost per 1K tokens in USD")
+    supports_json_schema: bool = Field(default=True, description="Supports structured JSON output")
+    is_local: bool = Field(default=False, description="Is a local model (free)")
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        strict=True,
+        extra="forbid",
+        frozen=True,  # Make instances immutable (config shouldn't change at runtime)
+    )
 
 
 # ============================================================================

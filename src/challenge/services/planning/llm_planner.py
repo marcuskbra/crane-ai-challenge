@@ -11,6 +11,7 @@ Features comprehensive observability via LiteLLM callbacks for monitoring and de
 import json
 import logging
 import re
+from enum import Enum
 from typing import Any
 
 import litellm
@@ -22,6 +23,140 @@ from challenge.services.planning.examples import ALL_EXAMPLES, format_example_fo
 from challenge.services.planning.planner import PatternBasedPlanner
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Type-Safe Models for LLM Callbacks
+# ============================================================================
+
+
+class LLMUsage(BaseModel):
+    """Token usage information from LLM response."""
+
+    prompt_tokens: int = Field(default=0, description="Tokens in the prompt")
+    completion_tokens: int = Field(default=0, description="Tokens in the completion")
+    total_tokens: int = Field(default=0, description="Total tokens used")
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        strict=True,
+        extra="forbid",
+    )
+
+
+class LLMRequestParams(BaseModel):
+    """Parameters for LLM request."""
+
+    model: str = Field(..., description="Model identifier")
+    messages: list[dict[str, str]] = Field(default_factory=list, description="Chat messages")
+    temperature: float | None = Field(default=None, description="Sampling temperature")
+    response_format: dict[str, Any] | None = Field(default=None, description="Response format specification")
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        strict=True,
+        extra="allow",  # Allow extra fields from LiteLLM
+    )
+
+
+class LLMResponseData(BaseModel):
+    """Response data from LLM with usage information."""
+
+    usage: LLMUsage | None = Field(default=None, description="Token usage information")
+    model: str | None = Field(default=None, description="Model that generated the response")
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        strict=True,
+        extra="allow",  # Allow extra fields from provider responses
+    )
+
+
+def _extract_usage_from_response(response: Any) -> LLMUsage:
+    """
+    Extract usage information from LLM response object.
+
+    Uses safe attribute access and returns default values if usage is missing.
+
+    NOTE: This function uses hasattr/getattr as an exception to TYPING_GUIDE.md
+    anti-patterns because it interfaces with external LiteLLM callback objects
+    that have no stable type contract across providers (OpenAI, Anthropic, Ollama).
+    The response objects vary by provider and cannot be typed consistently.
+
+    Args:
+        response: Response object from LLM provider
+
+    Returns:
+        LLMUsage with token counts (defaults to 0 if unavailable)
+
+    """
+    # Check if response has usage attribute
+    if not hasattr(response, "usage"):
+        return LLMUsage()
+
+    usage_obj = response.usage
+
+    # Extract token counts with safe defaults
+    prompt_tokens = getattr(usage_obj, "prompt_tokens", 0) if usage_obj else 0
+    completion_tokens = getattr(usage_obj, "completion_tokens", 0) if usage_obj else 0
+    total_tokens = getattr(usage_obj, "total_tokens", 0) if usage_obj else 0
+
+    return LLMUsage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
+    )
+
+
+def _parse_request_params(kwargs: dict[str, Any]) -> LLMRequestParams:
+    """
+    Parse LiteLLM request kwargs into typed model.
+
+    Args:
+        kwargs: Raw request parameters from LiteLLM
+
+    Returns:
+        LLMRequestParams with validated fields
+
+    """
+    return LLMRequestParams(
+        model=kwargs.get("model", "unknown"),
+        messages=kwargs.get("messages", []),
+        temperature=kwargs.get("temperature"),
+        response_format=kwargs.get("response_format"),
+    )
+
+
+# ============================================================================
+# Model Type Detection
+# ============================================================================
+
+
+class OllamaModel(str, Enum):
+    """Known Ollama model families."""
+
+    QWEN = "qwen"
+    LLAMA = "llama"
+    PHI = "phi"
+    MISTRAL = "mistral"
+    TINYLLAMA = "tinyllama"
+
+
+def _is_ollama_model(model_name: str) -> bool:
+    """
+    Check if model name indicates an Ollama model.
+
+    Uses enum-based detection instead of string comparisons for type safety.
+
+    Args:
+        model_name: Model identifier to check
+
+    Returns:
+        True if model appears to be an Ollama model
+
+    """
+    model_lower = model_name.lower()
+    return any(ollama_type.value in model_lower for ollama_type in OllamaModel)
 
 
 # ============================================================================
@@ -40,18 +175,18 @@ def log_llm_success(kwargs: dict[str, Any], response_obj: Any, start_time: Any, 
     - Request parameters
 
     Args:
-        kwargs: Request parameters passed to LiteLLM
+        kwargs: Request parameters passed to LiteLLM (raw dict from external library)
         response_obj: Response object from LLM provider
         start_time: Request start timestamp
         end_time: Request end timestamp
 
     """
     try:
-        model = kwargs.get("model", "unknown")
-        messages = kwargs.get("messages", [])
-        prompt_tokens = getattr(response_obj.usage, "prompt_tokens", 0) if hasattr(response_obj, "usage") else 0
-        completion_tokens = getattr(response_obj.usage, "completion_tokens", 0) if hasattr(response_obj, "usage") else 0
-        total_tokens = getattr(response_obj.usage, "total_tokens", 0) if hasattr(response_obj, "usage") else 0
+        # Parse request parameters into typed model
+        request_params = _parse_request_params(kwargs)
+
+        # Extract usage information with type safety
+        usage = _extract_usage_from_response(response_obj)
 
         # Calculate cost using LiteLLM's built-in pricing
         try:
@@ -63,10 +198,10 @@ def log_llm_success(kwargs: dict[str, Any], response_obj: Any, start_time: Any, 
         duration_ms = int((end_time - start_time).total_seconds() * 1000) if start_time and end_time else 0
 
         logger.info(
-            f"LLM SUCCESS: model={model}, tokens={total_tokens} "
-            f"(prompt={prompt_tokens}, completion={completion_tokens}), "
+            f"LLM SUCCESS: model={request_params.model}, tokens={usage.total_tokens} "
+            f"(prompt={usage.prompt_tokens}, completion={usage.completion_tokens}), "
             f"cost=${cost:.6f}, duration={duration_ms}ms, "
-            f"messages={len(messages)}"
+            f"messages={len(request_params.messages)}"
         )
 
     except Exception as e:
@@ -84,17 +219,20 @@ def log_llm_failure(kwargs: dict[str, Any], response_obj: Any, start_time: Any, 
     - Failure timestamp
 
     Args:
-        kwargs: Request parameters passed to LiteLLM
+        kwargs: Request parameters passed to LiteLLM (raw dict from external library)
         response_obj: Response/error object from LLM provider
         start_time: Request start timestamp
         end_time: Request end timestamp
 
     """
     try:
-        model = kwargs.get("model", "unknown")
+        # Parse request parameters into typed model
+        request_params = _parse_request_params(kwargs)
         error_message = str(response_obj) if response_obj else "Unknown error"
 
-        logger.error(f"LLM FAILURE: model={model}, error={error_message}, will_fallback_to_pattern_planner=True")
+        logger.error(
+            f"LLM FAILURE: model={request_params.model}, error={error_message}, will_fallback_to_pattern_planner=True"
+        )
 
     except Exception as e:
         logger.warning(f"Error in LLM failure callback: {e}")
@@ -296,15 +434,18 @@ class LLMPlanner:
 
         return content.strip()
 
-    def _fix_variable_names(self, plan_dict: dict[str, Any]) -> dict[str, Any]:
+    def _fix_variable_names(self, plan_dict: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
         """
         Fix common variable naming mistakes in LLM-generated plans.
 
         Small models often use custom variable names like {calculation_result}, {result}, {value}
         instead of the required {step_N_output} format. This method detects and corrects these mistakes.
 
+        Note: Works with dict instead of Pydantic models because it processes potentially
+        malformed JSON during error recovery before final validation.
+
         Args:
-            plan_dict: Parsed plan dictionary from LLM
+            plan_dict: Parsed plan dictionary from LLM with 'steps' key
 
         Returns:
             Plan dictionary with corrected variable names
@@ -383,7 +524,7 @@ class LLMPlanner:
             formatted_model = self._format_model_name()
 
             # Detect if using local Ollama models (they don't support json_schema)
-            uses_ollama_model = any(m in self.model.lower() for m in ["qwen", "llama", "phi", "mistral", "tinyllama"])
+            uses_ollama_model = _is_ollama_model(self.model)
 
             # Prepare LLM request
             completion_args = {
