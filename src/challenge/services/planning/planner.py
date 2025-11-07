@@ -69,7 +69,50 @@ _COMPLETE_TODO_PATTERN = re.compile(
 _DELETE_TODO_PATTERN = re.compile(r"(?:delete|remove)\s+(?:todo|task)\s+(.{1,100})")
 
 # Special pattern: Multiple todos in comma-separated list
-_MULTI_TODO_PATTERN = re.compile(r"add\s+(?:todos|tasks)\s+for\s+(.{1,500})")
+# Matches: "add tasks for X, Y, Z" OR "add tasks: X, Y, Z" OR "add 3 tasks: X, Y, Z"
+_MULTI_TODO_PATTERN = re.compile(
+    r"add\s+(?:(?:\d+|one|two|three|four|five|several)\s+)?(?:todos|tasks)(?:\s+for\s+|\s*:\s*)(.{1,500})"
+)
+
+
+def _looks_like_math_expression(text: str) -> bool:
+    """
+    Check if text looks like a mathematical expression vs natural language reference.
+
+    Distinguishes between:
+    - Valid: "5 by 3", "15", "5 and 3" (explicit numbers/variables)
+    - Invalid: "it by 15", "the result", "use it" (pronouns and indirect references)
+
+    Args:
+        text: Expression candidate to validate
+
+    Returns:
+        True if contains explicit values, False if contains indirect references
+
+    """
+    text_lower = text.lower()
+
+    # Must contain at least one digit OR variable reference
+    has_number = any(char.isdigit() for char in text)
+    has_variable = "{step_" in text or "{result" in text
+
+    # Reject if contains pronouns or indirect references (without explicit variable syntax)
+    # These indicate reference to previous results rather than explicit expressions
+    indirect_references = [
+        " it ",  # pronoun
+        "it by",  # pronoun in operation
+        " it\n",  # pronoun at end
+        "^it ",  # pronoun at start
+        "the result",  # indirect reference (without {})
+        "the value",  # indirect reference
+        "the output",  # indirect reference
+        "use it",  # operation on pronoun
+        "take it",  # operation on pronoun
+    ]
+    has_indirect_reference = any(ref in text_lower for ref in indirect_references)
+
+    # Valid math: has explicit numbers/variables AND does NOT have indirect references
+    return (has_number or has_variable) and not has_indirect_reference
 
 
 class PatternBasedPlanner:
@@ -183,6 +226,9 @@ class PatternBasedPlanner:
         # Uses compiled _CALC_PATTERN for performance
         if match := _CALC_PATTERN.search(prompt):
             expression = match.group(1).strip()
+            # Strip trailing punctuation (commas, periods) that could cause AST parse errors
+            # e.g., "10 + 5," would be parsed as Tuple instead of BinOp
+            expression = expression.rstrip(",.;:!?")
             return PlanStep(
                 step_number=step_number,
                 tool_name="calculator",
@@ -193,27 +239,17 @@ class PatternBasedPlanner:
         # Pattern 1b: Natural language math expressions without keywords
         # Uses compiled _NATURAL_MATH_PATTERN for performance
         if _NATURAL_MATH_PATTERN.search(prompt):
+            # Strip trailing punctuation to avoid AST parse errors
+            expression = prompt.rstrip(",.;:!?")
             return PlanStep(
                 step_number=step_number,
                 tool_name="calculator",
-                tool_input={"expression": prompt},
-                reasoning=f"Calculate: {prompt}",
+                tool_input={"expression": expression},
+                reasoning=f"Calculate: {expression}",
             )
 
-        # Pattern 1c: Operation verbs (multiply, divide, add, subtract)
-        # SECURITY FIX: Uses compiled _OPERATION_PATTERN with length limits
-        # This eliminates the ReDoS vulnerability from catastrophic backtracking
-        if match := _OPERATION_PATTERN.search(prompt):
-            expression = match.group(1) or match.group(2)
-            if expression:  # Ensure we captured something
-                return PlanStep(
-                    step_number=step_number,
-                    tool_name="calculator",
-                    tool_input={"expression": prompt},
-                    reasoning=f"Calculate: {prompt}",
-                )
-
         # Pattern 2a: Add X as a todo/task
+        # IMPORTANT: Check BEFORE Pattern 1c to avoid "add" operation false matches
         # Uses compiled _ADD_AS_TODO_PATTERN for performance
         if match := _ADD_AS_TODO_PATTERN.search(prompt):
             text = match.group(1).strip()
@@ -223,6 +259,27 @@ class PatternBasedPlanner:
                 tool_input={"action": "add", "text": text},
                 reasoning=f"Add todo: {text}",
             )
+
+        # Pattern 1c: Operation verbs (multiply, divide, add, subtract)
+        # SECURITY FIX: Uses compiled _OPERATION_PATTERN with length limits
+        # This eliminates the ReDoS vulnerability from catastrophic backtracking
+        # NOTE: Checked AFTER Pattern 2a to avoid "add X as a todo" false matches
+        if match := _OPERATION_PATTERN.search(prompt):
+            expression = match.group(1) or match.group(2)
+            if expression:  # Ensure we captured something
+                # Strip trailing punctuation to avoid AST parse errors
+                expression_clean = prompt.rstrip(",.;:!?")
+                # Validate it looks like math, not natural language
+                # Reject patterns like "subtract it by 15" (natural language)
+                # Accept patterns like "subtract 15" or "5 - 3" (valid math)
+                if _looks_like_math_expression(expression_clean):
+                    return PlanStep(
+                        step_number=step_number,
+                        tool_name="calculator",
+                        tool_input={"expression": expression_clean},
+                        reasoning=f"Calculate: {expression_clean}",
+                    )
+                # If not valid math, return None so other patterns can try
 
         # Pattern 2b: Add todo/task X
         # Uses compiled _ADD_TODO_PATTERN for performance
