@@ -62,12 +62,12 @@ class ErrorResponse(BaseModel):
 
 
 # Custom exception handlers
-async def run_not_found_handler(request: Request, exc: RunNotFoundError) -> JSONResponse:
+async def run_not_found_handler(_request: Request, exc: RunNotFoundError) -> JSONResponse:
     """
     Handle RunNotFoundError exceptions.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: RunNotFoundError exception
 
     Returns:
@@ -88,12 +88,12 @@ async def run_not_found_handler(request: Request, exc: RunNotFoundError) -> JSON
     )
 
 
-async def invalid_prompt_handler(request: Request, exc: InvalidPromptError) -> JSONResponse:
+async def invalid_prompt_handler(_request: Request, exc: InvalidPromptError) -> JSONResponse:
     """
     Handle InvalidPromptError exceptions.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: InvalidPromptError exception
 
     Returns:
@@ -114,12 +114,12 @@ async def invalid_prompt_handler(request: Request, exc: InvalidPromptError) -> J
     )
 
 
-async def plan_generation_handler(request: Request, exc: PlanGenerationError) -> JSONResponse:
+async def plan_generation_handler(_request: Request, exc: PlanGenerationError) -> JSONResponse:
     """
     Handle PlanGenerationError exceptions.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: PlanGenerationError exception
 
     Returns:
@@ -140,12 +140,12 @@ async def plan_generation_handler(request: Request, exc: PlanGenerationError) ->
     )
 
 
-async def execution_error_handler(request: Request, exc: ExecutionError) -> JSONResponse:
+async def execution_error_handler(_request: Request, exc: ExecutionError) -> JSONResponse:
     """
     Handle ExecutionError exceptions.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: ExecutionError exception
 
     Returns:
@@ -166,12 +166,12 @@ async def execution_error_handler(request: Request, exc: ExecutionError) -> JSON
     )
 
 
-async def service_unavailable_handler(request: Request, exc: ServiceUnavailableError) -> JSONResponse:
+async def service_unavailable_handler(_request: Request, exc: ServiceUnavailableError) -> JSONResponse:
     """
     Handle ServiceUnavailableError exceptions.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: ServiceUnavailableError exception
 
     Returns:
@@ -192,12 +192,12 @@ async def service_unavailable_handler(request: Request, exc: ServiceUnavailableE
     )
 
 
-async def validation_error_handler(request: Request, exc: ValidationError) -> JSONResponse:
+async def validation_error_handler(_request: Request, exc: ValidationError) -> JSONResponse:
     """
     Handle custom ValidationError exceptions.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: ValidationError exception
 
     Returns:
@@ -218,14 +218,14 @@ async def validation_error_handler(request: Request, exc: ValidationError) -> JS
     )
 
 
-async def application_error_handler(request: Request, exc: ApplicationError) -> JSONResponse:
+async def application_error_handler(_request: Request, exc: ApplicationError) -> JSONResponse:
     """
     Handle generic ApplicationError exceptions.
 
     Fallback handler for application errors without specific handler.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: ApplicationError exception
 
     Returns:
@@ -247,12 +247,12 @@ async def application_error_handler(request: Request, exc: ApplicationError) -> 
 
 
 # Override default FastAPI handlers for enhanced logging
-async def request_validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def request_validation_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
     """
     Handle FastAPI request validation errors with enhanced logging.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: RequestValidationError from FastAPI
 
     Returns:
@@ -296,12 +296,12 @@ async def request_validation_handler(request: Request, exc: RequestValidationErr
     )
 
 
-async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+async def http_exception_handler(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
     """
     Handle HTTPException with enhanced logging.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: StarletteHTTPException
 
     Returns:
@@ -326,14 +326,14 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     )
 
 
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     """
     Handle any unhandled exceptions.
 
     Last resort handler for unexpected errors.
 
     Args:
-        request: HTTP request
+        _request: HTTP request
         exc: Any unhandled exception
 
     Returns:

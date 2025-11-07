@@ -245,7 +245,7 @@ llm-local-start: ## Start LiteLLM proxy for local development
 	@echo ""
 	@echo "Press Ctrl+C to stop the proxy"
 	@echo "─────────────────────────────────────"
-	litellm --config config/litellm_config.yaml
+	uv run litellm --config config/litellm_config.yaml --port 4000
 
 llm-local-stop: ## Stop LiteLLM proxy and Ollama service
 	@echo "🛑 Stopping LiteLLM and Ollama..."

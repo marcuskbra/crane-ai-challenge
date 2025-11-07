@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Constants
+MAX_RUNS_RETURNED = 100
+
 
 @router.post(
     "/runs",
@@ -91,10 +94,10 @@ async def list_runs(
 
     """
     # Validate parameters
-    if limit < 1 or limit > 100:
+    if limit < 1 or limit > MAX_RUNS_RETURNED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Limit must be between 1 and 100",
+            detail=f"Limit must be between 1 and {MAX_RUNS_RETURNED}",
         )
 
     if offset < 0:

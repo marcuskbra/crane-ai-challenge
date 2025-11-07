@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { PlayCircle, CheckCircle, XCircle, Clock, Loader, Activity, AlertCircle, TrendingUp } from 'lucide-react';
+import { PlayCircle, CheckCircle, XCircle, Clock, Loader, Activity, AlertCircle, TrendingUp, ExternalLink } from 'lucide-react';
 import { agentAPI, pollRunStatus } from '../services/api';
 import MetricsDashboard from './MetricsDashboard';
+
+// API docs URL - FastAPI serves docs at /api/docs
+const API_DOCS_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL.replace(/\/api\/v1$/, '')}/api/docs`
+  : 'http://localhost:8000/api/docs';
 
 const StatusBadge = ({ status }) => {
   const configs = {
@@ -756,9 +761,21 @@ export default function AgentRuntimeUI() {
                 <p className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">Execution Dashboard</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-900/30 rounded border border-emerald-600/40">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-lg shadow-emerald-400/50" />
-              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">{healthStatus}</span>
+            <div className="flex items-center gap-3">
+              <a
+                href={API_DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600/50 hover:border-cyan-500/50 rounded transition-all text-slate-300 hover:text-cyan-400"
+                title="Open API Documentation"
+              >
+                <ExternalLink size={14} />
+                <span className="text-xs font-semibold uppercase tracking-wider">API Docs</span>
+              </a>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-900/30 rounded border border-emerald-600/40">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-lg shadow-emerald-400/50" />
+                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">{healthStatus}</span>
+              </div>
             </div>
           </div>
         </div>
