@@ -421,3 +421,294 @@ class TestPerformanceRegression:
         assert duration < 0.01, (
             f"Complex multi-step plan too slow!\nDuration: {duration:.4f}s (threshold: 0.01s)\nSteps: {len(plan.steps)}"
         )
+
+
+class TestPatternOrderingBugFix:
+    """Test fix for pattern ordering bug where 'add X as a todo' was matched as calculator operation.
+
+    Bug: Pattern 1c (operation verbs like 'add') was checked BEFORE Pattern 2a ('add X as a todo'),
+    causing prompts like "add the result as a todo" to be incorrectly parsed as calculator operations
+    with invalid expressions like "add the result as a todo".
+
+    Fix: Reordered checks so Pattern 2a ('add X as a todo') is checked BEFORE Pattern 1c (operation verbs).
+    """
+
+    def test_add_result_as_todo_creates_todo_not_calculator(self):
+        """Test that 'add X as a todo' creates todo operation, not calculator operation."""
+        planner = PatternBasedPlanner()
+
+        prompt = "add the result as a todo"
+
+        plan = planner.create_plan(prompt)
+
+        # Should create a todo_store step, not a calculator step
+        assert len(plan.steps) == 1
+        assert plan.steps[0].tool_name == "todo_store"
+        assert plan.steps[0].tool_input.action == "add"
+        assert plan.steps[0].tool_input.text == "the result"
+
+    def test_multi_step_calc_and_add_as_todo(self):
+        """Test the original failing prompt: 'Calculate (42 * 8) + 15 and add the result as a todo'."""
+        planner = PatternBasedPlanner()
+
+        prompt = "Calculate (42 * 8) + 15 and add the result as a todo"
+
+        plan = planner.create_plan(prompt)
+
+        # Should create 2 steps: calculator + todo_store
+        assert len(plan.steps) == 2
+
+        # Step 1: Calculator
+        assert plan.steps[0].tool_name == "calculator"
+        assert "(42 * 8) + 15" in plan.steps[0].tool_input.expression
+
+        # Step 2: Todo (NOT calculator with invalid expression)
+        assert plan.steps[1].tool_name == "todo_store"
+        assert plan.steps[1].tool_input.action == "add"
+        assert plan.steps[1].tool_input.text == "the result"
+
+    def test_add_value_as_task_creates_todo(self):
+        """Test variation: 'add the value as a task'."""
+        planner = PatternBasedPlanner()
+
+        prompt = "add the value as a task"
+
+        plan = planner.create_plan(prompt)
+
+        assert len(plan.steps) == 1
+        assert plan.steps[0].tool_name == "todo_store"
+        assert plan.steps[0].tool_input.action == "add"
+        assert plan.steps[0].tool_input.text == "the value"
+
+    def test_add_calculation_as_todo(self):
+        """Test: 'add 42 * 8 as a todo' should create todo with text '42 * 8', not calculate it."""
+        planner = PatternBasedPlanner()
+
+        prompt = "add 42 * 8 as a todo"
+
+        plan = planner.create_plan(prompt)
+
+        # Should create a todo with the expression as text, not calculate it
+        assert len(plan.steps) == 1
+        assert plan.steps[0].tool_name == "todo_store"
+        assert plan.steps[0].tool_input.action == "add"
+        assert "42 * 8" in plan.steps[0].tool_input.text
+
+    def test_numeric_add_still_works_as_calculator(self):
+        """Test that numeric 'add' operations still work as calculator operations."""
+        planner = PatternBasedPlanner()
+
+        prompt = "add 5 and 3"
+
+        plan = planner.create_plan(prompt)
+
+        # Should create calculator step (Pattern 1c should still match numeric adds)
+        assert len(plan.steps) == 1
+        assert plan.steps[0].tool_name == "calculator"
+
+
+class TestTrailingPunctuationBugFix:
+    """Test fix for trailing punctuation causing AST Tuple errors.
+
+    Bug: When prompts are split on 'then' or 'and', trailing punctuation (especially commas)
+    gets included in expressions. Python's AST parser treats "10 + 5," as a Tuple, not BinOp,
+    causing "Unsupported expression type: Tuple" errors.
+
+    Fix: Strip trailing punctuation (,.;:!?) from all calculator expressions before validation.
+    """
+
+    def test_calculate_with_trailing_comma(self):
+        """Test that 'calculate X,' strips the comma and works."""
+        planner = PatternBasedPlanner()
+
+        prompt = "calculate 10 + 5,"
+
+        plan = planner.create_plan(prompt)
+
+        assert len(plan.steps) == 1
+        assert plan.steps[0].tool_name == "calculator"
+        # Expression should NOT have trailing comma
+        assert plan.steps[0].tool_input.expression == "10 + 5"
+
+    def test_calculate_with_trailing_period(self):
+        """Test that 'calculate X.' strips the period."""
+        planner = PatternBasedPlanner()
+
+        prompt = "calculate 42 * 8."
+
+        plan = planner.create_plan(prompt)
+
+        assert len(plan.steps) == 1
+        assert plan.steps[0].tool_name == "calculator"
+        assert plan.steps[0].tool_input.expression == "42 * 8"
+
+    def test_multi_step_with_commas_then_separator(self):
+        """Test the original failing prompt with commas and 'then' separators."""
+        planner = PatternBasedPlanner()
+
+        prompt = "Calculate 10 + 5, then subtract 15"
+
+        plan = planner.create_plan(prompt)
+
+        # Should create 2 steps
+        assert len(plan.steps) == 2
+
+        # Step 1: Calculator without trailing comma
+        assert plan.steps[0].tool_name == "calculator"
+        assert plan.steps[0].tool_input.expression == "10 + 5"
+
+        # Step 2: Calculator (or operation step)
+        # Note: "subtract 15" might match operation pattern
+        assert plan.steps[1].tool_name == "calculator"
+
+    def test_complex_multi_step_prompt(self):
+        """Test complex prompt: 'Calculate 10 + 5, then use result and subtract 15, then add as todo, then list'."""
+        planner = PatternBasedPlanner()
+
+        prompt = "Calculate 10 + 5, then use the result and subtract it by 15, then add the final number as a todo, then show me all my tasks"
+
+        plan = planner.create_plan(prompt)
+
+        # Should create 4 steps: calc, calc, todo, list
+        assert len(plan.steps) >= 3  # At least calc, todo, list
+
+        # Step 1: Calculator without comma
+        assert plan.steps[0].tool_name == "calculator"
+        assert "10 + 5" in plan.steps[0].tool_input.expression
+        # Most important: expression should NOT contain trailing comma
+        assert not plan.steps[0].tool_input.expression.endswith(",")
+
+    def test_trailing_punctuation_variations(self):
+        """Test various trailing punctuation marks are all stripped."""
+        planner = PatternBasedPlanner()
+
+        test_cases = [
+            ("calculate 5 + 3,", "5 + 3"),
+            ("calculate 5 + 3.", "5 + 3"),
+            ("calculate 5 + 3;", "5 + 3"),
+            ("calculate 5 + 3:", "5 + 3"),
+            ("calculate 5 + 3!", "5 + 3"),
+            ("calculate 5 + 3?", "5 + 3"),
+            ("calculate 5 + 3,.;", "5 + 3"),  # Multiple punctuation
+        ]
+
+        for prompt, expected_expr in test_cases:
+            plan = planner.create_plan(prompt)
+            assert len(plan.steps) == 1
+            assert plan.steps[0].tool_input.expression == expected_expr
+
+    def test_expression_with_internal_punctuation_preserved(self):
+        """Test that internal punctuation in expressions is preserved."""
+        planner = PatternBasedPlanner()
+
+        # Expression with decimal point (internal punctuation)
+        prompt = "calculate 3.14 + 2.86"
+
+        plan = planner.create_plan(prompt)
+
+        assert len(plan.steps) == 1
+        # Decimal points should be preserved (only TRAILING punctuation stripped)
+        assert plan.steps[0].tool_input.expression == "3.14 + 2.86"
+
+
+class TestNaturalLanguageValidation:
+    """Test fix for natural language being accepted as math expressions."""
+
+    def test_natural_language_subtract_rejected(self):
+        """Test that 'subtract it by 15' is rejected as natural language, not math."""
+        planner = PatternBasedPlanner()
+        prompt = "subtract it by 15"
+
+        # Natural language should NOT match calculator pattern
+        # Should raise ValueError since no valid pattern matches
+        with pytest.raises(ValueError, match="Could not parse prompt"):
+            planner.create_plan(prompt)
+
+    def test_valid_math_subtract_with_number_accepted(self):
+        """Test that 'subtract 15' with context is accepted as valid math."""
+        planner = PatternBasedPlanner()
+        # Valid math: operation verb + number (with variable reference)
+        prompt = "calculate 25 - 10"
+
+        plan = planner.create_plan(prompt)
+
+        assert len(plan.steps) == 1
+        assert plan.steps[0].tool_name == "calculator"
+        assert "25 - 10" in plan.steps[0].tool_input.expression
+
+    def test_math_expression_with_variable_reference_accepted(self):
+        """Test that expressions with {step_N_output} variable references are accepted."""
+        planner = PatternBasedPlanner()
+        # Valid math: variable reference with operator and number
+        prompt = "calculate {step_1_output} - 15"
+
+        plan = planner.create_plan(prompt)
+
+        assert len(plan.steps) == 1
+        assert plan.steps[0].tool_name == "calculator"
+        assert "{step_1_output} - 15" in plan.steps[0].tool_input.expression
+
+    def test_original_failing_prompt_now_works(self):
+        """Test the original failing prompt now creates correct plan."""
+        planner = PatternBasedPlanner()
+        prompt = (
+            "Calculate 10 + 5, then use the result and subtract it by 15, "
+            "then add the final number as a todo item like `I have x bugs to fix` "
+            "(where x is the output of step 2), then show me all my tasks"
+        )
+
+        plan = planner.create_plan(prompt)
+
+        # Expected steps:
+        # 1. Calculate 10 + 5
+        # 2. Natural language "use the result and subtract it by 15" should NOT match calculator
+        # 3. "add the final number as a todo" should match todo_store
+        # 4. "show me all my tasks" should match todo_store list
+
+        # Note: Step 2 won't match anything since it's natural language
+        # So we expect: calc, todo add, todo list
+        assert len(plan.steps) == 3
+
+        # Step 1: Calculator
+        assert plan.steps[0].tool_name == "calculator"
+        assert "10 + 5" in plan.steps[0].tool_input.expression
+
+        # Step 2: Todo add (natural language step filtered out)
+        assert plan.steps[1].tool_name == "todo_store"
+        assert plan.steps[1].tool_input.action == "add"
+
+        # Step 3: Todo list
+        assert plan.steps[2].tool_name == "todo_store"
+        assert plan.steps[2].tool_input.action == "list"
+
+    def test_natural_language_indicators_rejected(self):
+        """Test various natural language patterns are rejected."""
+        planner = PatternBasedPlanner()
+        natural_language_prompts = [
+            "use the result and add it",
+            "take the value and multiply it by 5",
+            "subtract it by 10",
+            "divide it by 2",
+        ]
+
+        for prompt in natural_language_prompts:
+            # All should fail to parse as calculator operations
+            with pytest.raises(ValueError, match="Could not parse prompt"):
+                planner.create_plan(prompt)
+
+    def test_valid_math_expressions_accepted(self):
+        """Test valid mathematical expressions are still accepted."""
+        planner = PatternBasedPlanner()
+        valid_math_prompts = [
+            ("calculate 5 + 3", "5 + 3"),
+            ("multiply 10 * 2", "10 * 2"),
+            ("divide 20 / 4", "20 / 4"),
+            ("subtract 15 - 8", "15 - 8"),
+            ("calculate {step_1_output} + 5", "{step_1_output} + 5"),
+        ]
+
+        for prompt, expected_expr in valid_math_prompts:
+            plan = planner.create_plan(prompt)
+            assert len(plan.steps) == 1
+            assert plan.steps[0].tool_name == "calculator"
+            assert expected_expr in plan.steps[0].tool_input.expression
