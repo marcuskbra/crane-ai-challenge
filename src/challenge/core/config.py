@@ -11,6 +11,9 @@ from typing import Literal
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Configuration constants
+DEFAULT_LLM_TEMPERATURE = 0.1
+
 
 class Settings(BaseSettings):
     """
@@ -142,61 +145,108 @@ class Settings(BaseSettings):
     )
 
     # ============================================================================
-    # LLM Configuration
+    # LLM Configuration (LiteLLM Multi-Provider Support)
     # ============================================================================
 
+    llm_provider: str = Field(
+        default="openai",
+        description="LLM provider (openai, anthropic, ollama, or custom via base_url)",
+    )
+
+    llm_api_key: str | None = Field(
+        default=None,
+        description="Primary LLM API key (provider-specific, dummy value for local LLMs)",
+    )
+
+    llm_base_url: str | None = Field(
+        default=None,
+        description="Custom API base URL for local LLMs (e.g., http://localhost:4000 for LiteLLM proxy, http://localhost:11434/v1 for Ollama)",
+    )
+
+    llm_model: str = Field(
+        default="gpt-4o-mini",
+        description="LLM model name (e.g., 'gpt-4o-mini', 'claude-3-5-sonnet-20241022', 'qwen2.5:3b' for Ollama)",
+    )
+
+    llm_temperature: float = Field(
+        default=DEFAULT_LLM_TEMPERATURE,
+        ge=0.0,
+        le=2.0,
+        description="LLM sampling temperature (lower = more deterministic, 0.0-2.0)",
+    )
+
+    # Backward compatibility: keep old openai_* names as aliases
     openai_api_key: str | None = Field(
         default=None,
-        description="OpenAI API key (required for OpenAI, dummy value for local LLMs)",
+        description="[DEPRECATED] Use llm_api_key instead. Kept for backward compatibility.",
     )
 
     openai_base_url: str | None = Field(
         default=None,
-        description="Custom OpenAI API base URL for local LLMs (e.g., http://localhost:4000 for LiteLLM, http://localhost:11434/v1 for Ollama)",
+        description="[DEPRECATED] Use llm_base_url instead. Kept for backward compatibility.",
     )
 
     openai_model: str = Field(
         default="gpt-4o-mini",
-        description="LLM model name (e.g., 'gpt-4o-mini' for OpenAI, 'qwen2.5:3b' for local models)",
+        description="[DEPRECATED] Use llm_model instead. Kept for backward compatibility.",
     )
 
     openai_temperature: float = Field(
-        default=0.1,
+        default=DEFAULT_LLM_TEMPERATURE,
         ge=0.0,
         le=2.0,
-        description="LLM sampling temperature (lower = more deterministic)",
+        description="[DEPRECATED] Use llm_temperature instead. Kept for backward compatibility.",
     )
 
     @model_validator(mode="after")
     def validate_llm_config(self) -> "Settings":
         """
-        Validate LLM configuration and provide dummy API key when needed.
+        Validate LLM configuration with backward compatibility and multi-provider support.
 
-        The OpenAI client requires an API key even when using custom base_url.
-        This validator runs after all fields are loaded and provides:
-        - Dummy key "sk-local-llm-dummy-key" when base_url is set (local LLM)
-        - Dummy key "sk-no-key-pattern-fallback" when neither is set (pattern-based fallback)
+        Handles migration from openai_* fields to generic llm_* fields while maintaining
+        backward compatibility. Provides dummy API keys for local LLMs and fallback scenarios.
+
+        Migration Strategy:
+        - If llm_* fields are not set, copy from openai_* fields (backward compatibility)
+        - If both are set, llm_* fields take precedence
+        - Provide dummy keys for local LLMs and pattern-based fallback
 
         Returns:
-            Settings: Self with validated/updated API key
+            Settings: Self with validated/updated configuration
 
         Note:
-            This ensures the application can start even without API key,
-            relying on the pattern-based planner fallback.
+            This ensures the application can start without API keys,
+            relying on the pattern-based planner fallback when needed.
 
         """
-        # If API key is already provided, use it
-        if self.openai_api_key:
-            return self
+        # Backward compatibility: migrate openai_* to llm_* if llm_* not explicitly set
+        if self.llm_api_key is None and self.openai_api_key:
+            self.llm_api_key = self.openai_api_key
 
-        # If using local LLM (base_url is set), provide dummy key
-        if self.openai_base_url:
-            self.openai_api_key = "sk-local-llm-dummy-key"
-            return self
+        if self.llm_base_url is None and self.openai_base_url:
+            self.llm_base_url = self.openai_base_url
 
-        # No API key and no base_url - will use pattern-based planner fallback
-        # Return dummy key to allow initialization
-        self.openai_api_key = "sk-no-key-pattern-fallback"
+        if self.llm_model == "gpt-4o-mini" and self.openai_model != "gpt-4o-mini":
+            self.llm_model = self.openai_model
+
+        if self.llm_temperature == DEFAULT_LLM_TEMPERATURE and self.openai_temperature != DEFAULT_LLM_TEMPERATURE:
+            self.llm_temperature = self.openai_temperature
+
+        # Provide dummy key for local LLMs (base_url is set)
+        if self.llm_base_url and not self.llm_api_key:
+            self.llm_api_key = "sk-local-llm-dummy-key"
+            self.llm_provider = "ollama"  # Assume Ollama for local setups
+
+        # Provide dummy key for pattern-based fallback (no API key or base_url)
+        if not self.llm_api_key and not self.llm_base_url:
+            self.llm_api_key = "sk-no-key-pattern-fallback"
+
+        # Update openai_* fields for backward compatibility with existing code
+        self.openai_api_key = self.llm_api_key
+        self.openai_base_url = self.llm_base_url
+        self.openai_model = self.llm_model
+        self.openai_temperature = self.llm_temperature
+
         return self
 
     # ============================================================================
@@ -277,11 +327,11 @@ class Settings(BaseSettings):
             return headers if headers else ["Content-Type"]
         return v
 
-    @field_validator("openai_base_url")
+    @field_validator("llm_base_url", "openai_base_url")
     @classmethod
     def validate_base_url(cls, v: str | None) -> str | None:
         """
-        Validate OpenAI base URL format.
+        Validate LLM base URL format (applies to both llm_base_url and openai_base_url).
 
         Args:
             v: Base URL string or None
@@ -297,7 +347,7 @@ class Settings(BaseSettings):
             # Basic URL format validation
             if not v.startswith(("http://", "https://")):
                 raise ValueError(
-                    f"OpenAI base URL must start with http:// or https://, got: {v}\n"
+                    f"LLM base URL must start with http:// or https://, got: {v}\n"
                     "Examples:\n"
                     "  - http://localhost:4000 (LiteLLM proxy)\n"
                     "  - http://localhost:11434/v1 (Ollama)\n"
@@ -354,11 +404,11 @@ class Settings(BaseSettings):
             True if base_url is configured (indicating local LLM), False otherwise
 
         """
-        return self.openai_base_url is not None
+        return self.llm_base_url is not None
 
     def get_llm_config_status(self) -> dict[str, str]:
         """
-        Get human-readable LLM configuration status.
+        Get human-readable LLM configuration status with multi-provider support.
 
         Returns:
             Dictionary with LLM configuration details for logging/debugging
@@ -366,16 +416,26 @@ class Settings(BaseSettings):
         """
         if self.is_using_local_llm():
             return {
-                "provider": "Local LLM",
-                "base_url": self.openai_base_url or "Not configured",
-                "model": self.openai_model,
-                "api_key_set": "Yes (dummy)" if self.openai_api_key else "No",
+                "provider": f"Local LLM ({self.llm_provider})",
+                "base_url": self.llm_base_url or "Not configured",
+                "model": self.llm_model,
+                "api_key_set": "Yes (dummy)" if self.llm_api_key else "No",
             }
+
+        # Determine provider from model name
+        provider_name = self.llm_provider.title()
+        if "claude" in self.llm_model.lower():
+            provider_name = "Anthropic"
+        elif "gpt" in self.llm_model.lower():
+            provider_name = "OpenAI"
+
         return {
-            "provider": "OpenAI",
-            "base_url": "Default (https://api.openai.com/v1)",
-            "model": self.openai_model,
-            "api_key_set": "Yes" if self.openai_api_key else "No (will fail)",
+            "provider": provider_name,
+            "base_url": "Default (provider-specific)",
+            "model": self.llm_model,
+            "api_key_set": "Yes"
+            if self.llm_api_key and not self.llm_api_key.startswith("sk-no-key")
+            else "No (pattern fallback)",
         }
 
 

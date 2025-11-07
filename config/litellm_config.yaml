@@ -5,6 +5,8 @@
 # - Testing: Local Ollama models (Qwen2.5, Phi-3, etc.)
 #
 # Usage:
+#   make llm-local-start
+#   # or manually:
 #   litellm --config config/litellm_config.yaml --port 4000
 #
 # Then configure your application:

@@ -7,14 +7,11 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
-    "httpx>=0.25.0",
-    "aiofiles>=24.0.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.38.0",
     "python-multipart>=0.0.20",
     "pydantic-settings>=2.11.0",
-    "openai>=1.0.0",
-    "pytest>=8.4.2",
+    "litellm>=1.50.0",
 ]
 
 [project.optional-dependencies]
@@ -27,11 +24,36 @@ dev = [
     "tox-uv>=1.29.0",
 ]
 test-integration = [
+    "httpx>=0.25.0",
     "pytest-httpx>=0.35.0",
     "pytest-timeout>=2.4.0",
     "pytest-mock>=3.15.1",
     "faker>=37.12.0",
     "freezegun>=1.5.5",
+]
+llm-local = [
+    # Core proxy dependencies
+    "backoff>=2.0.0",
+    "orjson>=3.0.0",
+    "apscheduler>=3.10.0",
+    "cryptography>=41.0.0",
+    "email-validator>=2.0.0",
+    "fastapi-sso>=0.10.0",
+    "pyjwt>=2.8.0",
+    "pyyaml>=6.0.0",
+
+    # Server dependencies
+    "fastapi>=0.115.0",  # Already in main deps
+    "uvicorn[standard]>=0.38.0",  # Already in main deps
+    "python-multipart>=0.0.20",  # Already in main deps
+    "gunicorn>=21.0.0",
+
+    # Database and caching
+    "prisma>=0.11.0",
+    "redis>=5.0.0",
+
+    # Additional services
+    "resend>=0.8.0",
 ]
 
 [build-system]
