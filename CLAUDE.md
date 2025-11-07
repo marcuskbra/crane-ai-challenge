@@ -4,7 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**crane-challenge** - A modern Python project using Clean Architecture, Python 3.12+, managed with `uv` for fast dependency management.
+**crane-challenge** - A modern Python project using Clean Architecture, Python 3.12+, managed with `uv` for fast
+dependency management.
+
+## 📚 Project Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[README.md](README.md)**: Project overview, quick start, and key features (~424 lines)
+- **[docs/architecture.md](docs/architecture.md)**: 4-layer Clean Architecture details and request flow
+- **[docs/multi_provider_llm.md](docs/multi_provider_llm.md)**: Multi-provider LLM setup (OpenAI, Anthropic, Ollama)
+- **[docs/api_examples.md](docs/api_examples.md)**: Complete API usage examples with curl commands
+- **[docs/deployment.md](docs/deployment.md)**: Configuration, Docker deployment, environment setup
+- **[docs/design_decisions.md](docs/design_decisions.md)**: Architectural choices and trade-offs (11 decisions)
+- **[docs/limitations.md](docs/limitations.md)**: Current constraints and production readiness (4/10 score)
+- **[docs/improvements.md](docs/improvements.md)**: Roadmap to production (35-48 hours total effort)
+
+**Key Documentation Highlights**:
+
+- All major sections extracted from README for focused reading
+- Cross-referenced between documents for easy navigation
+- Comprehensive analysis from specialized AI agents (Backend Architect, AI Engineer, MLOps Engineer)
 
 ## Architecture Overview
 
@@ -43,6 +63,7 @@ src/challenge/
 ```
 
 ### Design Principles
+
 - **Clean Architecture**: Dependencies flow inward (API → Services → Domain)
 - **Domain-Centric**: Core business logic independent of external concerns
 - **Dependency Inversion**: Infrastructure depends on domain abstractions
@@ -52,36 +73,43 @@ src/challenge/
 ### Layer Responsibilities
 
 **Domain Layer** (`domain/`):
+
 - Core business entities (Plan, Run, ExecutionStep)
 - Domain types and value objects (ToolInput, ToolOutput)
 - Domain services (when business logic spans multiple entities)
 - **Independent** of infrastructure and external concerns
 
 **Application Services** (`services/`):
+
 - Planning service: Converts prompts to execution plans
 - Orchestration service: Executes plans and manages runs
 - Coordinates domain logic and infrastructure
 
 **Infrastructure** (`infrastructure/`):
+
 - Tool implementations (calculator, todo_store)
 - External integrations
 - Depends on domain abstractions (protocols, types)
 
 **API Layer** (`api/`):
+
 - HTTP interface with FastAPI
 - Request/response schemas (separate from domain models)
 - Route handlers delegate to services
 
 **Core** (`core/`):
+
 - Shared utilities, configuration, exceptions
 - Used across all layers
 
 ### Dependency Flow
+
 - API → Services → Domain ← Infrastructure
 - Domain layer has NO dependencies on other layers
 - Infrastructure implements domain protocols
 
 ### Architecture Benefits
+
 - **Maintainability**: Clear boundaries and responsibilities
 - **Testability**: Each layer testable in isolation
 - **Scalability**: Easy to add complexity in appropriate layers
@@ -145,11 +173,11 @@ src/challenge/
 - **KISS principle**: Keep It Simple, Stupid - avoid unnecessary complexity
 - **YAGNI principle**: You Aren't Gonna Need It - avoid over-engineering
 - **SOLID principles**:
-  - Single Responsibility
-  - Open/Closed
-  - Liskov Substitution
-  - Interface Segregation
-  - Dependency Inversion
+    - Single Responsibility
+    - Open/Closed
+    - Liskov Substitution
+    - Interface Segregation
+    - Dependency Inversion
 - **Layered architecture**: Separate code into api, services (when needed), models (when needed), core
 - **Business logic organization**: Keep business logic in service layer when it grows beyond simple CRUD
 - **DRY principle**: Avoid code duplication; reuse existing functionality
@@ -170,9 +198,9 @@ src/challenge/
 ### Testing Strategy
 
 - **Test Types**:
-  - Unit tests for API routes and business logic (fast, isolated)
-  - Integration tests for external integrations (when added)
-  - Performance tests for critical operations
+    - Unit tests for API routes and business logic (fast, isolated)
+    - Integration tests for external integrations (when added)
+    - Performance tests for critical operations
 - **Simple Fixtures**: Use pytest fixtures in `conftest.py` for test data
 - **Parameterized Tests**: Use `@pytest.mark.parametrize` for test variations
 - **Layer Testing**: Test each layer independently with appropriate mocks
@@ -248,9 +276,9 @@ tests/
 - **Version control**: Commit frequently with clear, conventional commit messages
 - **Test-Driven Development**: Write tests before implementation
 - **TDD Cycle**:
-  1. **Red**: Create failing tests that define requirements
-  2. **Green**: Implement minimal code to pass tests
-  3. **Refactor**: Optimize while maintaining test compliance
+    1. **Red**: Create failing tests that define requirements
+    2. **Green**: Implement minimal code to pass tests
+    3. **Refactor**: Optimize while maintaining test compliance
 - **Continuous Testing**: Run tests before every commit
 - **Code Review**: Self-review changes before committing
 - **Impact assessment**: Evaluate how changes affect other parts of the codebase
@@ -262,11 +290,13 @@ tests/
 **IMPORTANT**: This project uses standard Python exceptions with FastAPI's HTTPException for HTTP errors.
 
 ### Pattern Overview
+
 Use standard Python exceptions for business logic errors, and FastAPI's HTTPException for HTTP responses:
 
 ```python
 from fastapi import HTTPException, status
 from pydantic import ValidationError
+
 
 # Service method with standard exceptions
 async def get_user(user_id: str) -> dict:
@@ -280,6 +310,7 @@ async def get_user(user_id: str) -> dict:
         raise ValueError(f"User not found: {user_id}")
 
     return user
+
 
 # API endpoint handles exceptions
 @router.get("/users/{user_id}")
@@ -302,22 +333,27 @@ async def get_user_endpoint(user_id: str):
 ```
 
 ### Custom Exceptions (When Needed)
+
 Create custom exceptions for specific business errors:
 
 ```python
 # In core/exceptions.py
 class UserNotFoundError(Exception):
     """Raised when user doesn't exist."""
+
     def __init__(self, user_id: str):
         self.user_id = user_id
         super().__init__(f"User not found: {user_id}")
 
+
 class InsufficientBalanceError(Exception):
     """Raised when account balance is insufficient."""
+
     def __init__(self, required: float, available: float):
         self.required = required
         self.available = available
         super().__init__(f"Insufficient balance: need {required}, have {available}")
+
 
 # Usage in service
 async def transfer_money(from_id: str, to_id: str, amount: float):
@@ -325,6 +361,7 @@ async def transfer_money(from_id: str, to_id: str, amount: float):
     if from_account.balance < amount:
         raise InsufficientBalanceError(amount, from_account.balance)
     # ... rest of transfer logic
+
 
 # API endpoint maps to HTTP status
 @router.post("/transfer")
@@ -339,26 +376,31 @@ async def transfer_endpoint(request: TransferRequest):
 ```
 
 ### Benefits of Standard Exceptions
+
 - **Pythonic**: Follows standard Python patterns and idioms
 - **Simple**: No additional complexity or type machinery
 - **FastAPI Integration**: Natural integration with FastAPI exception handling
 - **Familiar**: Standard pattern understood by all Python developers
 
 ### Testing with Standard Exceptions
+
 Test both success and error paths:
 
 ```python
 import pytest
+
 
 # Test success case
 async def test_get_user_success():
     user = await get_user("valid-id")
     assert user["id"] == "valid-id"
 
+
 # Test error case
 async def test_get_user_not_found():
     with pytest.raises(ValueError, match="User not found"):
         await get_user("invalid-id")
+
 
 # Test HTTP endpoint error handling
 def test_get_user_endpoint_not_found(test_client):
@@ -370,6 +412,7 @@ def test_get_user_endpoint_not_found(test_client):
 ## Common Patterns
 
 ### Adding a New API Endpoint
+
 1. Create route handler in `src/challenge/api/routes/`
 2. Define request/response schemas in `api/schemas/` (ALWAYS separate from routes)
 3. Import domain models from `domain/models/`
@@ -378,13 +421,16 @@ def test_get_user_endpoint_not_found(test_client):
 6. Write tests in `tests/unit/api/routes/`
 
 Example:
+
 ```python
 # api/schemas/users.py
 from pydantic import BaseModel, EmailStr
 
+
 class UserCreate(BaseModel):
     email: EmailStr
     name: str
+
 
 # api/routes/users.py
 from fastapi import APIRouter, HTTPException, status
@@ -392,6 +438,7 @@ from challenge.api.schemas.users import UserCreate
 from challenge.domain.models.user import User
 
 router = APIRouter()
+
 
 @router.post("/users", response_model=User)
 async def create_user(data: UserCreate):
@@ -403,6 +450,7 @@ async def create_user(data: UserCreate):
 ```
 
 ### Adding Domain Models
+
 Core business entities go in the domain layer:
 
 1. Create Pydantic models in `src/challenge/domain/models/`
@@ -411,9 +459,11 @@ Core business entities go in the domain layer:
 4. Write validation tests in `tests/unit/domain/`
 
 Example:
+
 ```python
 # domain/models/user.py
 from pydantic import BaseModel, EmailStr, Field
+
 
 class User(BaseModel):
     """User domain entity."""
@@ -423,6 +473,7 @@ class User(BaseModel):
 ```
 
 ### Adding Application Services
+
 Business logic and orchestration:
 
 1. Create service in `src/challenge/services/` (planning, orchestration, etc.)
@@ -432,9 +483,11 @@ Business logic and orchestration:
 5. Write tests in `tests/unit/services/`
 
 Example:
+
 ```python
 # services/user_service.py
 from challenge.domain.models.user import User
+
 
 class UserService:
     def __init__(self, repository: UserRepository):
@@ -445,14 +498,17 @@ class UserService:
             raise ValueError("User already exists")
         return await self.repository.create(User(email=email, name=name))
 
+
 # api/dependencies.py
 from challenge.services.user_service import UserService
+
 
 def get_user_service() -> UserService:
     return UserService(repository=get_user_repository())
 ```
 
 ### Adding Infrastructure (Tools, External Services)
+
 Implementation of external concerns:
 
 1. Create implementation in `src/challenge/infrastructure/`
@@ -461,10 +517,12 @@ Implementation of external concerns:
 4. Write tests in `tests/unit/infrastructure/`
 
 Example:
+
 ```python
 # infrastructure/tools/implementations/new_tool.py
 from challenge.infrastructure.tools.base import BaseTool, ToolResult
 from challenge.domain.types import ToolInput
+
 
 class NewTool(BaseTool):
     """New tool implementation."""

@@ -1,8 +1,10 @@
 # Type Safety and Strong Typing Guide
 
-This guide establishes the typing standards and best practices for this project. All code contributions must follow these guidelines to ensure type safety, maintainability, and developer experience.
+This guide establishes the typing standards and best practices for this project. All code contributions must follow
+these guidelines to ensure type safety, maintainability, and developer experience.
 
-> **Note**: This project uses a simplified 3-layer Clean Architecture where the Domain layer includes services and interfaces. This reduces boilerplate while maintaining strong typing throughout.
+> **Note**: This project uses a simplified 3-layer Clean Architecture where the Domain layer includes services and
+> interfaces. This reduces boilerplate while maintaining strong typing throughout.
 
 ## 🎯 Core Principles
 
@@ -24,9 +26,11 @@ def process_entity(entity: Dict[str, Any]) -> Dict[str, Any]:
         entity["priority"] = 1
     return entity
 
+
 # ✅ ALWAYS DO THIS
 from pydantic import BaseModel
 from challenge.domain.entities import Entity, EntityStatus, EntityPriority
+
 
 def process_entity(entity: Entity) -> Entity:
     if entity.status == EntityStatus.ACTIVE:
@@ -43,20 +47,25 @@ async def search(query: str) -> Union[Dict[str, Any], SearchResponse]:
         return {"error": "message"}
     return SearchResponse(...)
 
+
 # ✅ ALWAYS DO THIS
 from typing import Literal, Union
 from pydantic import BaseModel
 
+
 class SearchSuccess(BaseModel):
     success: Literal[True] = True
     data: SearchResponse
+
 
 class SearchError(BaseModel):
     success: Literal[False] = False
     error_code: str
     message: str
 
+
 SearchResult = Union[SearchSuccess, SearchError]
+
 
 async def search(query: str) -> SearchResult:
     if error:
@@ -67,6 +76,7 @@ async def search(query: str) -> SearchResult:
 **IMPORTANT: Pydantic Model Building Requirements**
 
 When using discriminated unions with Pydantic models that reference other models:
+
 - Use actual imports, NOT conditional `TYPE_CHECKING` imports
 - Pydantic needs the actual classes at runtime to build models
 - This is especially critical in the domain layer
@@ -74,14 +84,18 @@ When using discriminated unions with Pydantic models that reference other models
 ```python
 # ❌ WRONG - Will cause runtime errors
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from .entities import Entity
+
 
 class EntitySuccess(BaseModel):
     entities: list["Entity"]  # Will fail at runtime!
 
+
 # ✅ CORRECT - Actual imports for Pydantic
 from .entities import Entity  # Direct import
+
 
 class EntitySuccess(BaseModel):
     entities: list[Entity]  # Works at runtime
@@ -99,16 +113,19 @@ if priority in ["high", "critical"]:
 # ✅ ALWAYS DO THIS
 from enum import Enum
 
+
 class EntityStatus(str, Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     PENDING = "pending"
+
 
 class Priority(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
 
 if status == EntityStatus.ACTIVE:
     process()
@@ -126,8 +143,10 @@ if isinstance(result, dict) and "error" in result:
 # ✅ ALWAYS DO THIS
 from typing import TypeGuard
 
+
 def is_error_response(response: Response) -> TypeGuard[ErrorResponse]:
     return not response.success
+
 
 if is_error_response(result):
     handle_error(result.error_code, result.message)  # Type-safe access
@@ -139,6 +158,7 @@ if is_error_response(result):
 # ✅ REQUIRED MODEL CONFIGURATION
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class StronglyTypedModel(BaseModel):
     # Use descriptive field definitions
     entity_id: str = Field(..., description="Unique entity identifier")
@@ -147,11 +167,11 @@ class StronglyTypedModel(BaseModel):
 
     # CRITICAL: Never use use_enum_values=True
     model_config = ConfigDict(
-        validate_assignment=True,      # Validate on attribute assignment
-        use_enum_values=False,         # Keep enums as enums, not strings
-        strict=True,                   # Strict type checking
-        str_strip_whitespace=True,     # Auto-strip string fields
-        extra="forbid",               # Prevent unexpected fields
+        validate_assignment=True,  # Validate on attribute assignment
+        use_enum_values=False,  # Keep enums as enums, not strings
+        strict=True,  # Strict type checking
+        str_strip_whitespace=True,  # Auto-strip string fields
+        extra="forbid",  # Prevent unexpected fields
         json_schema_extra={
             "example": {
                 "entity_id": "ENT-123",
@@ -175,6 +195,7 @@ async def api_endpoint(request: Request) -> Response:
     # Step 3: Serialize ONLY at the response boundary
     return JSONResponse(content=result.model_dump())
 
+
 # Internal services work with models, not dicts
 class EntityService:
     async def process(self, entity: Entity) -> Entity:
@@ -194,10 +215,11 @@ from challenge.domain.errors import GetEntityResult, NotFoundError
 
 router = APIRouter()
 
+
 @router.get("/entities/{entity_id}")
 async def get_entity(
-    entity_id: str,
-    service: EntityService = Depends(get_entity_service)
+        entity_id: str,
+        service: EntityService = Depends(get_entity_service)
 ) -> EntityResponse:  # Typed response model
     # Call domain service
     result = await service.get_entity(entity_id)
@@ -213,6 +235,7 @@ async def get_entity(
 ### Domain Layer
 
 #### Domain Services
+
 ```python
 # domain/services/entity_service.py
 from challenge.domain.errors import (
@@ -221,6 +244,7 @@ from challenge.domain.errors import (
     NotFoundError,
     ValidationError
 )
+
 
 class EntityService:
     """Domain service with business logic orchestration."""
@@ -250,10 +274,12 @@ class EntityService:
 ```
 
 #### Domain Interfaces
+
 ```python
 # domain/interfaces/repository.py
 from abc import ABC, abstractmethod
 from typing import Optional
+
 
 class EntityRepository(ABC):
     """Domain interface - no infrastructure dependencies."""
@@ -281,6 +307,7 @@ class EntityRepository(ABC):
 from sqlalchemy.ext.asyncio import AsyncSession
 from challenge.domain.interfaces import EntityRepository
 from challenge.domain.entities import Entity
+
 
 class PostgresEntityRepository(EntityRepository):
     """PostgreSQL implementation of EntityRepository."""
@@ -316,6 +343,7 @@ class PostgresEntityRepository(EntityRepository):
 import pytest
 from challenge.domain.entities import Entity, EntityStatus
 
+
 @pytest.fixture
 def test_entity() -> Entity:
     """Returns typed model, not dict."""
@@ -325,6 +353,7 @@ def test_entity() -> Entity:
         status=EntityStatus.ACTIVE,
         created_at=datetime.utcnow()
     )
+
 
 @pytest.fixture
 def inactive_entity(test_entity: Entity) -> Entity:
@@ -353,6 +382,7 @@ assert result.resource_id == entity_id
 ```python
 from tests.builders import entity, request
 
+
 def test_entity_processing():
     # Use builder pattern for test data
     test_entity = (
@@ -375,12 +405,17 @@ def test_entity_processing():
 ```python
 # ❌ BANNED PATTERNS
 def process(data: Dict[str, Any]) -> Dict[str, Any]
-entities: List[Dict[str, Any]]
+
+
+    entities: List[Dict[str, Any]]
 Optional[Dict[str, Any]]
+
 
 # ✅ USE INSTEAD
 def process(data: ProcessRequest) -> ProcessResponse
-entities: list[Entity]
+
+
+    entities: list[Entity]
 Optional[EntityData]
 ```
 
@@ -430,6 +465,7 @@ def search() -> Union[list[Item], dict[str, str]]:
         return {"error": "message"}
     return items
 
+
 # ✅ USE INSTEAD
 def search() -> SearchResult:
     if error:
@@ -447,6 +483,7 @@ api_key = getattr(settings, "api_key", "")  # Runtime string lookups
 # ✅ ALWAYS USE - Type-safe direct access
 from challenge.infrastructure.config import Settings
 
+
 class ExternalAPIClient:
     def __init__(self, settings: Settings):
         # Direct attribute access with type safety
@@ -459,6 +496,7 @@ class ExternalAPIClient:
 ```
 
 **Key Points:**
+
 - Always add settings as typed fields in the Pydantic settings class
 - Use direct attribute access for type safety
 - Use `or ""` pattern for Optional[str] fields that need defaults
@@ -492,7 +530,7 @@ Type checking is already configured in `.pre-commit-config.yaml`:
       name: Type checking with ty
       entry: uv run ty check
       language: system
-      types: [python]
+      types: [ python ]
       pass_filenames: false
       require_serial: true
       always_run: true
@@ -501,16 +539,18 @@ Type checking is already configured in `.pre-commit-config.yaml`:
 ### VS Code / PyCharm Configuration
 
 For VS Code, add to `.vscode/settings.json`:
+
 ```json
 {
-    "python.linting.enabled": true,
-    "python.linting.pylintEnabled": false,
-    "python.linting.ruffEnabled": true,
-    "python.analysis.typeCheckingMode": "strict"
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.ruffEnabled": true,
+  "python.analysis.typeCheckingMode": "strict"
 }
 ```
 
 For PyCharm:
+
 - Enable type checking in Settings → Editor → Inspections → Python
 - Set inspection profile to "Type checker"
 
@@ -524,4 +564,5 @@ For PyCharm:
 
 ---
 
-**Remember: Strong typing is not optional - it's a requirement for code quality, maintainability, and developer experience.**
+**Remember: Strong typing is not optional - it's a requirement for code quality, maintainability, and developer
+experience.**
