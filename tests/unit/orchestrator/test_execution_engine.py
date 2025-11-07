@@ -99,8 +99,9 @@ class TestExecutionEngine:
         assert result.attempts == 1
 
     @pytest.mark.asyncio
-    async def test_execute_step_with_retry_success_on_second_attempt(self, mock_tools):
-        """Test retry logic succeeds on second attempt."""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_execute_step_with_retry_success_on_second_attempt(self, mock_sleep, mock_tools):
+        """Test retry logic succeeds on second attempt without waiting."""
         failing_tool = MockTool("flaky", should_fail=True)
         mock_tools.tools["flaky"] = failing_tool
         engine = ExecutionEngine(tools=mock_tools, max_retries=3)
@@ -127,6 +128,8 @@ class TestExecutionEngine:
         assert result.success is True
         assert result.output == "success"
         assert result.attempts == 2
+        # 3 total sleeps: 2 in execute_with_delay (one per attempt) + 1 retry backoff
+        assert mock_sleep.call_count == 3
 
     @pytest.mark.asyncio
     @patch("asyncio.sleep", new_callable=AsyncMock)
