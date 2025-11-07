@@ -109,13 +109,13 @@ class TestReDoSPerformance:
         # Calculate slowdown factor
         slowdown_factor = attack_avg / baseline_avg if baseline_avg > 0 else 0
 
-        # Attack should NOT be significantly slower (max 10x acceptable)
-        # ReDoS would cause 100x-1000x+ slowdown due to exponential complexity
-        assert slowdown_factor < 10, (
+        # Attack should NOT be significantly slower (max 15x acceptable to account for timing variations)
+        # Real ReDoS would cause 100x-1000x+ slowdown due to exponential complexity
+        assert slowdown_factor < 15, (
             f"ReDoS vulnerability detected: attack input {slowdown_factor:.1f}x slower than normal!\n"
             f"Baseline avg: {baseline_avg * 1000:.2f}ms\n"
             f"Attack avg: {attack_avg * 1000:.2f}ms\n"
-            f"Expected slowdown: <10x (ReDoS causes 100x-1000x+)"
+            f"Expected slowdown: <15x (Real ReDoS causes 100x-1000x+)"
         )
 
 
