@@ -49,6 +49,7 @@ make setup
 ```
 
 **What happens during setup:**
+
 - Installs all Python dependencies (backend + dev tools)
 - Creates `.env` configuration file (uses local LLM by default)
 - Starts Docker services (Ollama + LiteLLM)
@@ -57,6 +58,7 @@ make setup
 - **Optionally** starts frontend UI (http://localhost:3000)
 
 After setup completes (if you skip optional service startup):
+
 - **Run tests**: `make test-all`
 - **Start API**: `make run`
 - **Start UI**: `make ui-dev`
@@ -100,7 +102,8 @@ make run
 
 ### Configuration
 
-**IMPORTANT**: LLM configuration is now **required**. The application will fail loudly if credentials are missing or invalid. Pattern-based fallback is only used for transient errors (rate limits, service outages).
+**IMPORTANT**: LLM configuration is now **required**. The application will fail loudly if credentials are missing or
+invalid. Pattern-based fallback is only used for transient errors (rate limits, service outages).
 
 ```bash
 # Copy example configuration
@@ -433,37 +436,4 @@ This project demonstrates **production mindset** through thoughtful architectura
 
 ---
 
-## 🎯 Project Philosophy
-
-### What's Working
-
-- ✅ Excellent architectural foundation for production scaling
-- ✅ Security-first mindset with comprehensive testing
-- ✅ Thoughtful trade-offs documented and justified
-- ✅ Clear path to production with realistic estimates
-
-### What Needs Work
-
-- ⚠️ Infrastructure gaps (persistence, observability, security)
-- ⚠️ Performance optimization (parallel execution)
-- ⚠️ Advanced features (real-time updates, streaming)
-
-### Overall Verdict
-
-**High-quality POC demonstrating production mindset and architectural thinking**. The Clean Architecture adoption shows
-maturity, though it adds complexity for current scope. Major gaps are in production infrastructure rather than core
-design. With 11-15 hours of focused work on critical infrastructure, this becomes production-ready.
-
----
-
-## 📖 Additional Resources
-
-- **[CLAUDE.md](CLAUDE.md)**: Developer guide for Claude Code integration
-- **[Local LLM Testing Guide](claudedocs/local_llm_testing_guide.md)**: Comprehensive guide for local Ollama setup
-- **[API Documentation](http://localhost:8000/api/docs)**: Interactive Swagger UI (when server is running)
-
----
-
-## 📄 License
-
-This is a technical assessment project for Crane AI Engineering Interview.
+<div style="text-align: right;">Made with ❤️ and unemployment benefits!</div>

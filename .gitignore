@@ -108,3 +108,5 @@ secrets/
 /.claude/
 /.qodo/
 .backend.pid
+.serena/
+/.litellm.pid
