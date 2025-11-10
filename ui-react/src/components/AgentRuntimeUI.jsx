@@ -448,10 +448,16 @@ const RunDetails = ({ run }) => {
         {run.execution_log && run.execution_log.length > 0 && (() => {
           const totalExecutionTime = run.execution_log.reduce((sum, step) => sum + (step.duration_ms || 0), 0);
 
-          // Don't show performance summary if no timing data is available (old runs)
-          if (totalExecutionTime === 0) {
-            return null;
-          }
+          // Helper function to format timing with appropriate precision
+          const formatTime = (ms) => {
+            if (ms < 1) {
+              return `${(ms * 1000).toFixed(2)}µs`;
+            } else if (ms < 1000) {
+              return `${ms.toFixed(2)}ms`;
+            } else {
+              return `${(ms / 1000).toFixed(2)}s`;
+            }
+          };
 
           const avgTimePerStep = totalExecutionTime / run.execution_log.length;
           const slowestStep = run.execution_log.reduce((max, step) =>
@@ -468,16 +474,16 @@ const RunDetails = ({ run }) => {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Total Execution</div>
-                  <div className="text-lg font-bold text-slate-100">{totalExecutionTime.toFixed(0)}ms</div>
+                  <div className="text-lg font-bold text-slate-100">{formatTime(totalExecutionTime)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Avg per Step</div>
-                  <div className="text-lg font-bold text-slate-100">{avgTimePerStep.toFixed(0)}ms</div>
+                  <div className="text-lg font-bold text-slate-100">{formatTime(avgTimePerStep)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Slowest Step</div>
                   <div className="text-lg font-bold text-slate-100">
-                    #{slowestStep.step_number} ({(slowestStep.duration_ms || 0).toFixed(0)}ms)
+                    #{slowestStep.step_number} ({formatTime(slowestStep.duration_ms || 0)})
                   </div>
                 </div>
                 {totalRetries > 0 && (
