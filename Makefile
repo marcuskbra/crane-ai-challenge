@@ -229,16 +229,25 @@ backend-dev: ## Run backend API in background (similar to ui-dev)
 	else \
 		nohup uv run python -m challenge > /tmp/crane-backend.log 2>&1 & \
 		echo $$! > .backend.pid; \
-		sleep 2; \
-		if lsof -ti:8000 >/dev/null 2>&1; then \
-			echo "✅ Backend started successfully (PID: $$(cat .backend.pid))"; \
-			echo "   API: http://localhost:8000"; \
-			echo "   Docs: http://localhost:8000/api/docs"; \
-			echo "   Logs: tail -f /tmp/crane-backend.log"; \
-			echo "   Stop: make backend-stop"; \
-		else \
-			echo "❌ Backend failed to start"; \
+		echo "⏳ Waiting for backend to start (up to 10 seconds)..."; \
+		RETRIES=0; \
+		MAX_RETRIES=10; \
+		while [ $$RETRIES -lt $$MAX_RETRIES ]; do \
+			sleep 1; \
+			if lsof -ti:8000 >/dev/null 2>&1; then \
+				echo "✅ Backend started successfully (PID: $$(cat .backend.pid))"; \
+				echo "   API: http://localhost:8000"; \
+				echo "   Docs: http://localhost:8000/api/docs"; \
+				echo "   Logs: tail -f /tmp/crane-backend.log"; \
+				echo "   Stop: make backend-stop"; \
+				break; \
+			fi; \
+			RETRIES=$$(($$RETRIES + 1)); \
+		done; \
+		if [ $$RETRIES -eq $$MAX_RETRIES ]; then \
+			echo "❌ Backend failed to start after 10 seconds"; \
 			echo "   Check logs: cat /tmp/crane-backend.log"; \
+			echo "   Process may still be starting - check: make backend-logs"; \
 			rm -f .backend.pid; \
 		fi; \
 	fi
