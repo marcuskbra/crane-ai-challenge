@@ -26,12 +26,53 @@ This project includes comprehensive documentation in the `docs/` directory:
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Automated Setup (Recommended)
+
+**One command to set up everything:**
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd crane-challenge
+
+# Run automated setup (installs deps, Docker LLM, creates .env, verifies config)
+make setup
+# or: make first-run
+
+# The setup will:
+# 1. Check prerequisites (Docker, uv)
+# 2. Install all dependencies
+# 3. Create .env from template
+# 4. Start local LLM via Docker
+# 5. Verify everything works
+# 6. Optionally start backend & frontend (interactive prompts)
+```
+
+**What happens during setup:**
+- Installs all Python dependencies (backend + dev tools)
+- Creates `.env` configuration file (uses local LLM by default)
+- Starts Docker services (Ollama + LiteLLM)
+- Verifies LLM configuration is working
+- **Optionally** starts backend API server (http://localhost:8000)
+- **Optionally** starts frontend UI (http://localhost:3000)
+
+After setup completes (if you skip optional service startup):
+- **Run tests**: `make test-all`
+- **Start API**: `make run`
+- **Start UI**: `make ui-dev`
+- **View docs**: `make api-docs`
+
+### Manual Setup (Alternative)
+
+If you prefer step-by-step control:
+
+#### Prerequisites
 
 - **Python 3.12+**
 - **uv** (recommended for fast dependency management)
+- **Docker** (for local LLM testing)
 
-### Installation
+#### Installation
 
 ```bash
 # Clone repository
@@ -59,17 +100,20 @@ make run
 
 ### Configuration
 
-Create a `.env` file with your LLM provider settings:
+**IMPORTANT**: LLM configuration is now **required**. The application will fail loudly if credentials are missing or invalid. Pattern-based fallback is only used for transient errors (rate limits, service outages).
 
 ```bash
 # Copy example configuration
 cp .env.example .env
 
-# Basic configuration (works without LLM - uses pattern-based fallback)
+# Configure your LLM provider (REQUIRED)
 LLM_PROVIDER=openai                    # openai, anthropic, or ollama
 LLM_MODEL=gpt-4o-mini                  # or claude-3-5-sonnet-20241022, qwen2.5:3b
-LLM_API_KEY=sk-your-api-key-here       # Not needed for Ollama
+LLM_API_KEY=sk-your-api-key-here       # Required for cloud providers (OpenAI, Anthropic)
 LLM_BASE_URL=                          # Optional: http://localhost:11434/v1 for Ollama
+
+# Verify your configuration
+make llm-config-check
 ```
 
 **See [Multi-Provider LLM Setup](docs/multi_provider_llm.md) for detailed configuration options.**
@@ -100,8 +144,9 @@ make coverage
 
 - ✅ OpenAI, Anthropic, Ollama through unified interface
 - ✅ Intelligent complexity-based model routing
-- ✅ Automatic fallback to pattern-based planner
-- ✅ Zero downtime (never fails due to API issues)
+- ✅ Configuration validation (fails loudly on missing/invalid credentials)
+- ✅ Pattern-based fallback for transient errors only (rate limits, service outages)
+- ⚠️ **Configuration errors** (missing API keys) will fail loudly, not fall back
 
 **See [Design Decisions](docs/design_decisions.md#1-hybrid-planning-strategy) for detailed rationale.**
 
