@@ -147,6 +147,9 @@ first-run: ## 🚀 Complete first-time setup (deps + native LLM + backend + opti
 	@read -p "🎨 Start frontend UI? [y/N] " start_frontend; \
 	echo ""; \
 	if [ "$$start_frontend" = "y" ] || [ "$$start_frontend" = "Y" ]; then \
+		echo "📦 Installing frontend dependencies..."; \
+		make ui-install; \
+		echo ""; \
 		echo "🎨 Starting Frontend UI in background..."; \
 		echo "   → Running on: http://localhost:3000"; \
 		echo "   → Will open in browser automatically"; \
