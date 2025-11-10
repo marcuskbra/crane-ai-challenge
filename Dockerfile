@@ -24,9 +24,11 @@ COPY src/ ./src/
 
 # Install dependencies using uv (much faster than pip)
 # Create virtual environment and install production dependencies only
+# Note: uv pip install . installs base dependencies (production)
+#       Optional dependencies (dev, test) are excluded by default
 RUN uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
-    uv pip install -e . --no-dev
+    uv pip install .
 
 # ==============================================================================
 # Stage 2: Runtime

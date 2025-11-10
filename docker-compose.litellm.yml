@@ -16,8 +16,6 @@
 #   # Stop services
 #   docker-compose -f docker-compose.litellm.yml down
 
-version: '3.8'
-
 services:
   # ========================================
   # Ollama: Local LLM Runtime
@@ -61,16 +59,15 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
-    command: >
-      sh -c "
-        echo 'Pulling Qwen2.5-3B model...' &&
-        ollama pull qwen2.5:3b &&
-        echo 'Model ready!' &&
-        echo 'Optional: Pull alternative models' &&
-        # ollama pull phi3:mini &&
-        # ollama pull qwen2.5:1.5b &&
-        echo 'Setup complete!'
-      "
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo 'Pulling Qwen2.5-3B model...'
+      ollama pull qwen2.5:3b
+      echo 'Model ready!'
+      echo 'Optional: Pull alternative models'
+      # ollama pull phi3:mini
+      # ollama pull qwen2.5:1.5b
+      echo 'Setup complete!'
     environment:
       - OLLAMA_HOST=ollama:11434
     networks:
@@ -89,9 +86,9 @@ services:
       - ./config/litellm_config.yaml:/app/config.yaml:ro
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-1234}  # Optional auth
-      - OPENAI_API_KEY=${OPENAI_API_KEY}  # For fallback to OpenAI
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}  # For fallback to OpenAI
       - LITELLM_LOG=INFO
-      - DATABASE_URL=${LITELLM_DATABASE_URL:-}  # Optional persistent logging
+      # DATABASE_URL removed - not needed for basic operation, was causing startup failures
     command: --config /app/config.yaml --port 4000 --detailed_debug
     depends_on:
       ollama:
@@ -99,11 +96,11 @@ services:
       ollama-setup:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:4000/health/liveliness\")' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - crane-network
 
@@ -125,6 +122,7 @@ services:
     environment:
       # LLM Configuration (point to LiteLLM proxy)
       - OPENAI_BASE_URL=http://litellm:4000
+      - OPENAI_API_KEY=sk-1234  # Match LITELLM_MASTER_KEY
       - OPENAI_MODEL=qwen2.5:3b
       - OPENAI_TEMPERATURE=0.1
 
@@ -138,16 +136,19 @@ services:
       # Orchestrator Configuration
       - MAX_RETRIES=3
       - STEP_TIMEOUT=30.0
+
+      # Ensure no DATABASE_URL is set
+      - DATABASE_URL=
     depends_on:
       litellm:
         condition: service_healthy
     command: ["uvicorn", "challenge.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v1/health\")' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - crane-network
 
