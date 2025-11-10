@@ -1,12 +1,12 @@
 # Makefile for crane-challenge
 # Modern Python project with Clean Architecture
 
-.PHONY: help install dev-install test lint lint-fix format format-fix type-check coverage validate clean run \
+.PHONY: help install dev-install setup first-run test lint lint-fix format format-fix type-check coverage validate clean run stop-all \
 	test-all test-unit test-integration test-fast api-dev api-prod api-test api-docs api-health \
+	backend-dev backend-stop backend-logs \
 	ui-install ui-dev ui-build ui-clean ui-lint ui-test \
-	llm-docker-up llm-docker-down llm-docker-logs llm-docker-test llm-docker-clean \
 	llm-local-setup llm-local-pull llm-local-pull-fast llm-local-start llm-local-stop llm-local-test \
-	llm-check llm-status llm-models
+	llm-check llm-status llm-models llm-config-check
 
 # ============================================================================
 # Help & Documentation
@@ -16,13 +16,13 @@ help: ## Show this help message
 	@echo "crane-challenge - Available commands:"
 	@echo ""
 	@echo "Setup & Installation:"
-	@grep -E '^(install|dev-install):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(setup|first-run|install|dev-install):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Development:"
 	@grep -E '^(run|test|lint|format|type-check|validate):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "API Development:"
-	@grep -E '^(api-.*):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(api-.*|backend-.*):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Frontend UI (Visualization):"
 	@grep -E '^(ui-.*):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
@@ -34,7 +34,7 @@ help: ## Show this help message
 	@grep -E '^(llm-.*):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Cleanup:"
-	@grep -E '^(clean.*):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(clean.*|stop-all):.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}'
 
 # ============================================================================
 # Setup & Installation
@@ -49,6 +49,146 @@ dev-install: ## Install all dependencies including dev and test extras
 	uv tool install tox --with tox-uv
 	@echo "Installing pre-commit hooks..."
 	pre-commit install
+	@echo ""
+	@echo "✅ Dependencies installed!"
+	@echo ""
+	@echo "📋 Next steps:"
+	@echo "  1. Copy .env.example to .env and configure LLM credentials"
+	@echo "  2. Run: make llm-config-check (to verify configuration)"
+	@echo "  3. Run: make test (to verify everything works)"
+
+setup: first-run ## Alias for first-run (complete automated setup)
+
+first-run: ## 🚀 Complete first-time setup (deps + native LLM + backend + optional frontend)
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║          🚀 Crane Challenge - First-Time Setup                 ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will:"
+	@echo "  1. Check prerequisites (Docker, uv)"
+	@echo "  2. Install all dependencies"
+	@echo "  3. Setup .env configuration"
+	@echo "  4. Start native LLM services (Ollama + LiteLLM)"
+	@echo "  5. Start backend API in background"
+	@echo "  6. Optionally start frontend UI"
+	@echo ""
+	@read -p "Continue? [y/N] " response; \
+	if [ "$$response" != "y" ] && [ "$$response" != "Y" ]; then \
+		echo "Setup cancelled."; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "Step 1/5: Checking Prerequisites"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "❌ Docker not found. Please install Docker Desktop:"; \
+		echo "   https://www.docker.com/products/docker-desktop"; \
+		exit 1; \
+	fi
+	@echo "✅ Docker installed: $$(docker --version)"
+	@if ! command -v uv >/dev/null 2>&1; then \
+		echo "❌ uv not found. Installing..."; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	fi
+	@echo "✅ uv installed: $$(uv --version)"
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "Step 2/5: Installing Dependencies"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@make dev-install
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "Step 3/5: Setting up .env Configuration"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@if [ ! -f .env ]; then \
+		echo "📝 Creating .env from .env.example..."; \
+		cp .env.example .env; \
+		echo "✅ .env file created"; \
+		echo ""; \
+		echo "⚠️  Using default configuration (local LLM via Docker)"; \
+		echo "   To use cloud providers (OpenAI/Anthropic), edit .env"; \
+	else \
+		echo "✅ .env file already exists (keeping your configuration)"; \
+	fi
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "Step 4/5: Setting Up Native Local LLM Services"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "🚀 Installing and configuring Ollama + LiteLLM..."
+	@make llm-local-setup
+	@echo ""
+	@echo "📥 Pulling qwen2.5:3b model (~1.9GB)..."
+	@ollama pull qwen2.5:3b
+	@echo "✅ Model downloaded!"
+	@echo ""
+	@echo "🚀 Starting LiteLLM proxy..."
+	@make llm-local-start
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "Step 5/5: Verifying Configuration"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@make llm-config-check
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║              ✅ Setup Complete - Ready to Use!                 ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "Starting Backend API"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo ""
+	@make backend-dev
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "Optional: Start Frontend UI"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo ""
+	@read -p "🎨 Start frontend UI? [y/N] " start_frontend; \
+	echo ""; \
+	if [ "$$start_frontend" = "y" ] || [ "$$start_frontend" = "Y" ]; then \
+		echo "🎨 Starting Frontend UI in background..."; \
+		echo "   → Running on: http://localhost:3000"; \
+		echo "   → Will open in browser automatically"; \
+		echo ""; \
+		nohup make ui-dev > /tmp/crane-ui.log 2>&1 & \
+		sleep 3; \
+		echo "✅ Frontend started in background (PID: $$!)"; \
+		echo ""; \
+		echo "📝 Frontend Management:"; \
+		echo "  • View logs:     tail -f /tmp/crane-ui.log"; \
+		echo "  • Stop frontend: make stop-all"; \
+		echo "  • Or kill process on port 3000"; \
+		echo ""; \
+	fi; \
+	echo ""; \
+	echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║              🎉 All Services Running!                          ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "🔗 Service URLs:"; \
+	echo "  • Backend API:         http://localhost:8000"; \
+	echo "  • API Docs:            http://localhost:8000/api/docs"; \
+	echo "  • Frontend UI:         http://localhost:3000"; \
+	echo ""; \
+	echo "🎯 Quick Commands:"; \
+	echo "  • Test everything:     make test-all"; \
+	echo "  • Backend logs:        make backend-logs"; \
+	echo "  • Frontend logs:       tail -f /tmp/crane-ui.log"; \
+	echo "  • Stop all services:   make stop-all"; \
+	echo "  • Check LLM status:    make llm-status"; \
+	echo ""; \
+	echo "🤖 Native LLM Services:"; \
+	echo "  • View logs:           tail -f /tmp/litellm.log"; \
+	echo "  • Stop services:       make llm-local-stop"; \
+	echo "  • Restart services:    make llm-local-stop && make llm-local-start"; \
+	echo "  • Pull more models:    ollama pull qwen2.5:3b"; \
+	echo ""; \
+	echo "📚 Documentation:"; \
+	echo "  • README.md"; \
+	echo "  • docs/architecture.md"; \
+	echo "  • docs/multi_provider_llm.md"; \
+	echo ""
 
 # ============================================================================
 # Development & Running
@@ -68,7 +208,7 @@ api-prod: ## Run the API server in production mode
 	uv run uvicorn challenge.presentation.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 api-test: ## Run API tests only
-	$(PYTEST_ENV) uv run pytest tests/unit/presentation/api/ -xvs
+	uv run pytest tests/unit/presentation/api/ -xvs
 
 api-health: ## Check API health endpoint
 	@echo "Checking API health..."
@@ -77,6 +217,48 @@ api-health: ## Check API health endpoint
 api-docs: ## Open API documentation in browser
 	@echo "Opening API docs at http://localhost:8000/api/docs"
 	@python -m webbrowser http://localhost:8000/api/docs || open http://localhost:8000/api/docs || xdg-open http://localhost:8000/api/docs
+
+backend-dev: ## Run backend API in background (similar to ui-dev)
+	@echo "🚀 Starting backend API server in background..."
+	@if lsof -ti:8000 >/dev/null 2>&1; then \
+		echo "⚠️  Backend already running on port 8000"; \
+		echo "   Stop it with: make backend-stop"; \
+	else \
+		nohup uv run python -m challenge > /tmp/crane-backend.log 2>&1 & \
+		echo $$! > .backend.pid; \
+		sleep 2; \
+		if lsof -ti:8000 >/dev/null 2>&1; then \
+			echo "✅ Backend started successfully (PID: $$(cat .backend.pid))"; \
+			echo "   API: http://localhost:8000"; \
+			echo "   Docs: http://localhost:8000/api/docs"; \
+			echo "   Logs: tail -f /tmp/crane-backend.log"; \
+			echo "   Stop: make backend-stop"; \
+		else \
+			echo "❌ Backend failed to start"; \
+			echo "   Check logs: cat /tmp/crane-backend.log"; \
+			rm -f .backend.pid; \
+		fi; \
+	fi
+
+backend-stop: ## Stop backend API server
+	@echo "🛑 Stopping backend API server..."
+	@if [ -f .backend.pid ]; then \
+		PID=$$(cat .backend.pid); \
+		if ps -p $$PID > /dev/null 2>&1; then \
+			kill $$PID 2>/dev/null && echo "   ✅ Backend stopped (PID: $$PID)" || echo "   ⚠️  Could not stop backend"; \
+		else \
+			echo "   ℹ️  Backend process not found (cleaning up stale PID file)"; \
+		fi; \
+		rm -f .backend.pid; \
+	elif lsof -ti:8000 >/dev/null 2>&1; then \
+		kill -9 $$(lsof -ti:8000) 2>/dev/null && echo "   ✅ Backend stopped (port 8000)" || echo "   ⚠️  Could not stop backend"; \
+	else \
+		echo "   ℹ️  No backend running on port 8000"; \
+	fi
+
+backend-logs: ## View backend API logs
+	@echo "📋 Backend API logs (Ctrl+C to exit):"
+	@tail -f /tmp/crane-backend.log
 
 # ============================================================================
 # Frontend UI (Visualization Tool)
@@ -142,37 +324,31 @@ coverage: ## Run tests with coverage report
 # Local LLM Testing
 # ============================================================================
 
-# Docker-based Local LLM Testing
-# --------------------------------
-
-llm-docker-up: ## Start local LLM services via Docker Compose
-	@echo "🚀 Starting Ollama + LiteLLM services..."
-	docker compose -f docker-compose.litellm.yml up -d
-	@echo "⏳ Waiting for services to be ready (30s)..."
-	@sleep 30
-	@echo "✅ Services started! LiteLLM proxy available at http://localhost:4000"
-	@echo "📊 View logs: make llm-docker-logs"
-
-llm-docker-down: ## Stop local LLM Docker services
-	@echo "🛑 Stopping Ollama + LiteLLM services..."
-	docker compose -f docker-compose.litellm.yml down
-	@echo "✅ Services stopped!"
-
-llm-docker-logs: ## View logs from local LLM Docker services
-	docker compose -f docker-compose.litellm.yml logs -f
-
-llm-docker-test: ## Run tests using Docker-based local LLM
-	@echo "🧪 Running tests with Docker local LLM..."
-	@echo "📝 Ensure services are running: make llm-docker-up"
-	OPENAI_BASE_URL=http://localhost:4000 \
-	OPENAI_MODEL=qwen2.5:3b \
-	uv run pytest tests/ -xvs --tb=short -m "not openai"
-	@echo "✅ Tests completed with local LLM!"
-
-llm-docker-clean: ## Clean local LLM Docker volumes and images
-	@echo "🧹 Cleaning Docker volumes and images..."
-	docker compose -f docker-compose.litellm.yml down -v
-	@echo "✅ Cleanup complete!"
+stop-all: ## 🛑 Stop all services (native LLM + backend + frontend)
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║              🛑 Stopping All Services...                       ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "1️⃣  Stopping native LLM services (LiteLLM + Ollama)..."
+	@make llm-local-stop
+	@echo ""
+	@echo "2️⃣  Stopping backend API..."
+	@make backend-stop
+	@echo ""
+	@echo "3️⃣  Stopping frontend UI (port 3000)..."
+	@if lsof -ti:3000 >/dev/null 2>&1; then \
+		kill -9 $$(lsof -ti:3000) 2>/dev/null && echo "   ✅ Frontend stopped (port 3000)" || echo "   ⚠️  Could not stop frontend"; \
+	else \
+		echo "   ℹ️  No frontend running on port 3000"; \
+	fi
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║              ✅ All Services Stopped!                          ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "📝 Note: Redis/Postgres Docker containers kept running."
+	@echo "   Stop them with: docker compose down"
+	@echo ""
 
 # Local Development LLM Testing
 # ------------------------------
@@ -198,8 +374,12 @@ llm-local-setup: ## Install Ollama and LiteLLM for local development
 	fi
 	@echo ""
 	@echo "2️⃣  Installing LiteLLM..."
-	@pip install litellm 2>/dev/null || uv pip install litellm
-	@echo "   ✅ LiteLLM installed"
+	@if command -v litellm >/dev/null 2>&1; then \
+		echo "   ✅ LiteLLM already installed ($$(litellm --version 2>/dev/null || echo 'version unknown'))"; \
+	else \
+		uv tool install 'litellm[proxy]'; \
+		echo "   ✅ LiteLLM installed with proxy extras"; \
+	fi
 	@echo ""
 	@echo "3️⃣  Starting Ollama service..."
 	@if [[ "$$(uname)" == "Darwin" ]]; then \
@@ -239,23 +419,17 @@ llm-local-pull-fast: ## Pull only fast/small models (1.5B)
 	@echo "📝 Then: make llm-local-start"
 
 llm-local-start: ## Start LiteLLM proxy for local development
-	@echo "🚀 Starting LiteLLM proxy..."
-	@echo "📝 Config: config/litellm_config.yaml"
-	@echo "🌐 Proxy will be available at http://localhost:4000"
-	@echo ""
-	@echo "Press Ctrl+C to stop the proxy"
-	@echo "─────────────────────────────────────"
-	uv run litellm --config config/litellm_config.yaml --port 4000
+	@./scripts/start-litellm.sh
 
 llm-local-stop: ## Stop LiteLLM proxy and Ollama service
-	@echo "🛑 Stopping LiteLLM and Ollama..."
-	@pkill -f "litellm" 2>/dev/null || true
+	@./scripts/stop-litellm.sh
+	@echo "🛑 Stopping Ollama service..."
 	@if [[ "$$(uname)" == "Darwin" ]]; then \
-		brew services stop ollama 2>/dev/null || pkill -f "ollama serve"; \
+		brew services stop ollama 2>/dev/null || pkill -f "ollama serve" 2>/dev/null || true; \
 	else \
-		systemctl stop ollama 2>/dev/null || pkill -f "ollama serve"; \
+		systemctl stop ollama 2>/dev/null || pkill -f "ollama serve" 2>/dev/null || true; \
 	fi
-	@echo "✅ Services stopped!"
+	@echo "✅ All LLM services stopped!"
 
 llm-local-test: ## Run tests using local LLM (proxy must be running)
 	@echo "🧪 Running tests with local LLM..."
@@ -269,6 +443,10 @@ llm-local-test: ## Run tests using local LLM (proxy must be running)
 
 # LLM Utilities
 # --------------
+
+llm-config-check: ## Verify LLM configuration (API keys, base URL, etc.)
+	@echo "🔍 Verifying LLM configuration..."
+	@uv run python scripts/verify_llm_config.py
 
 llm-check: ## Check local LLM installation status
 	@echo "🔍 Checking local LLM installation..."
@@ -304,8 +482,8 @@ llm-check: ## Check local LLM installation status
 		echo "  ⚠️  Ollama not installed"; \
 	fi
 
-llm-status: ## Show status of local LLM services and configuration
-	@echo "📊 Local LLM Status"
+llm-status: ## Show status of native LLM services and configuration
+	@echo "📊 Native LLM Status"
 	@echo "═══════════════════════════════════════"
 	@echo ""
 	@make llm-check
@@ -316,9 +494,10 @@ llm-status: ## Show status of local LLM services and configuration
 	@echo "  Config: config/litellm_config.yaml"
 	@echo ""
 	@echo "Quick Commands:"
-	@echo "  Start:  make llm-local-start  (or make llm-docker-up)"
-	@echo "  Test:   make llm-local-test   (or make llm-docker-test)"
-	@echo "  Stop:   make llm-local-stop   (or make llm-docker-down)"
+	@echo "  Start:  make llm-local-start"
+	@echo "  Test:   make llm-local-test"
+	@echo "  Stop:   make llm-local-stop"
+	@echo "  Logs:   tail -f /tmp/litellm.log"
 
 llm-models: ## List available and downloaded LLM models
 	@echo "📦 Available LLM Models"
