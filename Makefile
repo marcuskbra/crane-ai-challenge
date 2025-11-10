@@ -104,10 +104,22 @@ first-run: ## 🚀 Complete first-time setup (deps + native LLM + backend + opti
 	@if [ ! -f .env ]; then \
 		echo "📝 Creating .env from .env.example..."; \
 		cp .env.example .env; \
-		echo "✅ .env file created"; \
+		echo "🔧 Configuring for local LLM (LiteLLM proxy)..."; \
+		echo "" >> .env; \
+		echo "# Local LLM Configuration (auto-configured by make setup)" >> .env; \
+		echo "# Edit these values to switch to cloud providers (OpenAI/Anthropic)" >> .env; \
+		echo "LLM_PROVIDER=openai" >> .env; \
+		echo "LLM_MODEL=qwen2.5:3b" >> .env; \
+		echo "LLM_BASE_URL=http://localhost:4000" >> .env; \
+		echo "LLM_API_KEY=sk-local-llm-dummy-key" >> .env; \
+		echo "✅ .env file created and configured for local LLM"; \
 		echo ""; \
-		echo "⚠️  Using default configuration (local LLM via Docker)"; \
-		echo "   To use cloud providers (OpenAI/Anthropic), edit .env"; \
+		echo "📝 Configuration:"; \
+		echo "   Provider: Local LLM via LiteLLM proxy"; \
+		echo "   Base URL: http://localhost:4000"; \
+		echo "   Model: qwen2.5:3b"; \
+		echo ""; \
+		echo "💡 To use cloud providers (OpenAI/Anthropic), edit .env"; \
 	else \
 		echo "✅ .env file already exists (keeping your configuration)"; \
 	fi
