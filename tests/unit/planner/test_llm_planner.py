@@ -2,8 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
+import litellm
 import pytest
 
+from challenge.core.exceptions import LLMConfigurationError
 from challenge.domain.models.plan import Plan
 from challenge.domain.models.run import ExecutionStep
 from challenge.services.orchestration.execution_context import ExecutionContext
@@ -76,10 +78,12 @@ async def test_llm_planner_multi_step(mock_litellm):
 
 
 @pytest.mark.asyncio
-async def test_llm_planner_fallback_on_api_error(mock_litellm):
-    """Test graceful fallback to pattern-based on API failure."""
-    # Mock API failure
-    mock_litellm.side_effect = Exception("API rate limit exceeded")
+async def test_llm_planner_fallback_on_rate_limit(mock_litellm):
+    """Test graceful fallback to pattern-based on rate limit (transient error)."""
+    # Mock rate limit error (transient - should fall back)
+    mock_litellm.side_effect = litellm.RateLimitError(
+        message="Rate limit exceeded", llm_provider="openai", model="gpt-4o-mini"
+    )
 
     # Test planner with fallback
     planner = LLMPlanner()
@@ -91,6 +95,66 @@ async def test_llm_planner_fallback_on_api_error(mock_litellm):
     assert plan.steps[0].tool_name == "calculator"
     # Token count should be 0 since LLM wasn't used
     assert planner.last_token_count == 0
+
+
+@pytest.mark.asyncio
+async def test_llm_planner_fails_on_auth_error(mock_litellm):
+    """Test that authentication errors fail loudly (configuration error)."""
+    # Mock authentication error (configuration - should NOT fall back)
+    mock_litellm.side_effect = litellm.AuthenticationError(
+        message="Invalid API key", llm_provider="openai", model="gpt-4o-mini"
+    )
+
+    # Test planner - should raise LLMConfigurationError
+    planner = LLMPlanner()
+    with pytest.raises(LLMConfigurationError) as exc_info:
+        await planner.create_plan("calculate 2+3")
+
+    # Verify error details
+    assert "Invalid API key" in str(exc_info.value)
+    error = exc_info.value
+    assert isinstance(error, LLMConfigurationError)
+    assert error.provider in ["LiteLLM", "gpt-4o-mini"]
+    assert error.fix_hint is not None
+    assert "LLM_API_KEY" in error.fix_hint
+
+
+@pytest.mark.asyncio
+async def test_llm_planner_fails_on_invalid_model(mock_litellm):
+    """Test that invalid model errors fail loudly (configuration error)."""
+    # Mock model not found error (configuration - should NOT fall back)
+    mock_litellm.side_effect = litellm.NotFoundError(
+        message="Model not found", llm_provider="openai", model="invalid-model-name"
+    )
+
+    # Test planner - should raise LLMConfigurationError
+    planner = LLMPlanner(model="invalid-model-name")
+    with pytest.raises(LLMConfigurationError) as exc_info:
+        await planner.create_plan("calculate 2+3")
+
+    # Verify error details
+    assert "Model not found" in str(exc_info.value)
+    error = exc_info.value
+    assert isinstance(error, LLMConfigurationError)
+    assert error.fix_hint is not None
+    assert "invalid-model-name" in error.fix_hint
+
+
+@pytest.mark.asyncio
+async def test_llm_planner_fallback_on_service_unavailable(mock_litellm):
+    """Test graceful fallback on service unavailable (transient error)."""
+    # Mock service unavailable (transient - should fall back)
+    mock_litellm.side_effect = litellm.ServiceUnavailableError(
+        message="Service temporarily down", llm_provider="openai", model="gpt-4o-mini"
+    )
+
+    # Test planner with fallback
+    planner = LLMPlanner()
+    plan = await planner.create_plan("calculate 2+3")
+
+    # Should fall back to pattern-based planner
+    assert isinstance(plan, Plan)
+    assert len(plan.steps) == 1
 
 
 @pytest.mark.asyncio
@@ -229,9 +293,11 @@ async def test_system_prompt_includes_tool_descriptions(mock_litellm):
 
 
 @pytest.mark.asyncio
-async def test_empty_prompt_fallback(mock_litellm):
-    """Test that empty prompts use fallback and raise ValueError."""
-    mock_litellm.side_effect = Exception("Should not be called")
+async def test_empty_prompt_raises_error(mock_litellm):
+    # Use a transient error so fallback happens (not a configuration error)
+    mock_litellm.side_effect = litellm.ServiceUnavailableError(
+        message="Service down", llm_provider="openai", model="gpt-4o-mini"
+    )
 
     planner = LLMPlanner()
 

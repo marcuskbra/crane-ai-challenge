@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
-Verify Local LLM Configuration.
+Verify LLM Configuration.
 
-This script tests that the OpenAI API key validator is working correctly
-for different configuration scenarios (local LLM, OpenAI, pattern-based fallback).
+This script checks that LiteLLM is properly configured with valid credentials.
+The application NO LONGER uses pattern-based fallback by default - you MUST
+configure LLM credentials properly.
+
+Pattern-based fallback is ONLY used for transient errors (rate limits, service
+outages), NOT for missing configuration.
+
+Valid configurations:
+1. Local LLM: OPENAI_BASE_URL set (e.g., http://localhost:4000)
+2. Cloud Provider: Real OPENAI_API_KEY set (starts with sk-...)
+
+Exit codes:
+  0 - Configuration valid
+  1 - Configuration invalid or missing
 """
 
 import os
@@ -11,129 +23,182 @@ import sys
 import traceback
 from pathlib import Path
 
-from challenge.core.config import Settings
-
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from challenge.core.config import Settings
 
-def test_local_llm_config():
-    """Test configuration with local LLM (base_url set)."""
-    print("Test 1: Local LLM Configuration")
-    print("=" * 50)
 
-    # Set local LLM environment
-    os.environ["OPENAI_BASE_URL"] = "http://localhost:4000"
-    os.environ["OPENAI_MODEL"] = "qwen2.5:3b"
-    os.environ.pop("OPENAI_API_KEY", None)
+def check_local_llm_config() -> tuple[bool, str]:
+    """
+    Check if local LLM is configured.
 
+    Returns:
+        Tuple of (is_valid, message)
+
+    """
     settings = Settings()
 
-    print(f"  OPENAI_BASE_URL: {settings.openai_base_url}")
-    print(f"  OPENAI_MODEL: {settings.openai_model}")
-    print(f"  OPENAI_API_KEY: {settings.openai_api_key}")
-    print()
+    # Local LLM requires OPENAI_BASE_URL to be set
+    if settings.openai_base_url:
+        # Dummy key is acceptable for local LLM
+        api_key = settings.openai_api_key
+        if api_key and (api_key == "sk-local-llm-dummy-key" or api_key.startswith("sk-")):
+            return True, (
+                f"✅ Local LLM configured:\n"
+                f"   BASE_URL: {settings.openai_base_url}\n"
+                f"   MODEL: {settings.openai_model}\n"
+                f"   API_KEY: {'(dummy key for local LLM)' if api_key == 'sk-local-llm-dummy-key' else '(set)'}"
+            )
+        else:
+            return False, (
+                f"❌ Local LLM BASE_URL set but API_KEY invalid:\n"
+                f"   BASE_URL: {settings.openai_base_url}\n"
+                f"   API_KEY: {settings.openai_api_key}\n"
+                f"   Expected: API_KEY starting with 'sk-' or 'sk-local-llm-dummy-key'"
+            )
 
-    if settings.openai_api_key == "sk-local-llm-dummy-key":
-        print("  ✅ PASS: Dummy API key automatically set for local LLM")
-        return True
-    else:
-        print(f"  ❌ FAIL: Expected 'sk-local-llm-dummy-key', got '{settings.openai_api_key}'")
-        return False
+    return False, "Local LLM not configured (no OPENAI_BASE_URL)"
 
 
-def test_pattern_fallback_config():
-    """Test configuration with no API key or base_url (pattern-based fallback)."""
-    print("\nTest 2: Pattern-Based Fallback Configuration")
-    print("=" * 50)
+def check_cloud_provider_config() -> tuple[bool, str]:
+    """
+    Check if cloud provider (OpenAI/Anthropic) is configured.
 
-    # Clear all LLM configuration
-    os.environ.pop("OPENAI_BASE_URL", None)
-    os.environ.pop("OPENAI_MODEL", None)
-    os.environ.pop("OPENAI_API_KEY", None)
+    Returns:
+        Tuple of (is_valid, message)
 
+    """
     settings = Settings()
 
-    print(f"  OPENAI_BASE_URL: {settings.openai_base_url}")
-    print(f"  OPENAI_MODEL: {settings.openai_model}")
-    print(f"  OPENAI_API_KEY: {settings.openai_api_key}")
+    # Cloud provider requires real API key (not dummy)
+    if not settings.openai_base_url:  # No base_url means cloud provider
+        if settings.openai_api_key and settings.openai_api_key.startswith("sk-"):
+            # Check it's not a dummy key
+            if settings.openai_api_key in ["sk-local-llm-dummy-key", "sk-no-key-pattern-fallback"]:
+                return False, (
+                    f"❌ Cloud provider configured but API_KEY is a dummy key:\n"
+                    f"   API_KEY: {settings.openai_api_key}\n"
+                    f"   You must set a REAL API key from OpenAI, Anthropic, etc."
+                )
+            else:
+                return True, (
+                    f"✅ Cloud provider configured:\n"
+                    f"   MODEL: {settings.openai_model}\n"
+                    f"   API_KEY: sk-...{settings.openai_api_key[-4:]} (last 4 chars)"
+                )
+        else:
+            return False, (
+                f"❌ Cloud provider not configured:\n"
+                f"   API_KEY: {settings.openai_api_key or '(not set)'}\n"
+                f"   Expected: Real API key starting with 'sk-'"
+            )
+
+    return False, "Cloud provider not configured (OPENAI_BASE_URL is set)"
+
+
+def check_current_config() -> tuple[bool, str]:
+    """
+    Check current LLM configuration.
+
+    Returns:
+        Tuple of (is_valid, message)
+
+    """
+    # Try local LLM first
+    local_valid, local_msg = check_local_llm_config()
+    if local_valid:
+        return True, local_msg
+
+    # Try cloud provider
+    cloud_valid, cloud_msg = check_cloud_provider_config()
+    if cloud_valid:
+        return True, cloud_msg
+
+    # Neither configured properly
+    return False, (
+        f"❌ LLM not configured properly!\n\nLocal LLM check:\n  {local_msg}\n\nCloud provider check:\n  {cloud_msg}\n"
+    )
+
+
+def print_setup_instructions():
+    """Print instructions for setting up LLM configuration."""
+    print("\n" + "=" * 70)
+    print("📋 SETUP INSTRUCTIONS")
+    print("=" * 70)
     print()
-
-    if settings.openai_api_key == "sk-no-key-pattern-fallback":
-        print("  ✅ PASS: Dummy API key set for pattern-based fallback")
-        return True
-    else:
-        print(f"  ❌ FAIL: Expected 'sk-no-key-pattern-fallback', got '{settings.openai_api_key}'")
-        return False
-
-
-def test_explicit_api_key():
-    """Test configuration with explicit API key."""
-    print("\nTest 3: Explicit API Key Configuration")
-    print("=" * 50)
-
-    # Set explicit API key
-    os.environ["OPENAI_API_KEY"] = "sk-test-explicit-key-123"
-    os.environ.pop("OPENAI_BASE_URL", None)
-
-    settings = Settings()
-
-    print(f"  OPENAI_API_KEY: {settings.openai_api_key}")
+    print("You must configure EITHER local LLM OR cloud provider:")
     print()
-
-    if settings.openai_api_key == "sk-test-explicit-key-123":
-        print("  ✅ PASS: Explicit API key preserved")
-        return True
-    else:
-        print(f"  ❌ FAIL: Expected 'sk-test-explicit-key-123', got '{settings.openai_api_key}'")
-        return False
+    print("Option 1: Local LLM (e.g., Ollama)")
+    print("-" * 70)
+    print("1. Start local LLM server:")
+    print("   docker run -d -p 4000:4000 litellm/litellm")
+    print()
+    print("2. Set environment variables in .env:")
+    print("   OPENAI_BASE_URL=http://localhost:4000")
+    print("   OPENAI_MODEL=qwen2.5:3b")
+    print("   # OPENAI_API_KEY not required for local")
+    print()
+    print("Option 2: Cloud Provider (OpenAI, Anthropic, etc.)")
+    print("-" * 70)
+    print("1. Get API key from your provider:")
+    print("   • OpenAI: https://platform.openai.com/api-keys")
+    print("   • Anthropic: https://console.anthropic.com/settings/keys")
+    print()
+    print("2. Set environment variables in .env:")
+    print("   OPENAI_API_KEY=sk-your-real-api-key-here")
+    print("   OPENAI_MODEL=gpt-4o-mini")
+    print("   # OPENAI_BASE_URL not needed for cloud")
+    print()
+    print("=" * 70)
+    print()
 
 
 def main():
-    """Run all configuration tests."""
+    """Run LLM configuration verification."""
     print("\n🔍 LLM Configuration Verification")
-    print("=" * 50)
+    print("=" * 70)
     print()
 
-    results = []
+    # Save current env to restore later
+    original_env = os.environ.copy()
 
     try:
-        results.append(("Local LLM", test_local_llm_config()))
-        results.append(("Pattern Fallback", test_pattern_fallback_config()))
-        results.append(("Explicit API Key", test_explicit_api_key()))
+        # Check current configuration
+        is_valid, message = check_current_config()
+
+        print(message)
+        print()
+
+        if is_valid:
+            print("=" * 70)
+            print("✅ SUCCESS: LLM is properly configured!")
+            print("=" * 70)
+            print()
+            print("You can now:")
+            print("  • Run the application: make run")
+            print("  • Run tests: make test-all")
+            print("  • Make API requests to create plans")
+            print()
+            return 0
+        else:
+            print("=" * 70)
+            print("❌ FAILURE: LLM configuration is invalid or missing!")
+            print("=" * 70)
+            print_setup_instructions()
+            print("After configuration, run this script again to verify:")
+            print("  uv run python scripts/verify_llm_config.py")
+            print()
+            return 1
+
     except Exception as e:
-        print(f"\n❌ Error during testing: {e}")
+        print(f"\n❌ Error during verification: {e}")
         traceback.print_exc()
         return 1
-
-    print("\n" + "=" * 50)
-    print("Summary")
-    print("=" * 50)
-
-    all_passed = all(result for _, result in results)
-
-    for name, passed in results:
-        status = "✅ PASS" if passed else "❌ FAIL"
-        print(f"  {status}: {name}")
-
-    print()
-
-    if all_passed:
-        print("✅ All tests passed!")
-        print()
-        print("Your configuration is working correctly:")
-        print("  • Local LLM (OPENAI_BASE_URL set) → Auto dummy key")
-        print("  • No config → Pattern-based fallback with dummy key")
-        print("  • Explicit key → Uses your provided key")
-        print()
-        print("You can now test with local LLM:")
-        print("  export OPENAI_BASE_URL=http://localhost:4000")
-        print("  export OPENAI_MODEL=qwen2.5:3b")
-        print("  make llm-local-test")
-        return 0
-    else:
-        print("❌ Some tests failed. Check the configuration.")
-        return 1
+    finally:
+        # Restore original environment
+        os.environ.clear()
+        os.environ.update(original_env)
 
 
 if __name__ == "__main__":

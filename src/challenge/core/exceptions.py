@@ -112,6 +112,39 @@ class ExecutionError(ApplicationError):
         self.reason = reason
 
 
+# LLM configuration exceptions
+class LLMConfigurationError(ApplicationError):
+    """
+    Raised when LLM is misconfigured (missing API key, invalid credentials, etc.).
+
+    This error indicates a configuration problem that MUST be fixed by the user.
+    It should NOT trigger fallback mechanisms - the application should fail loudly
+    so developers know they need to properly configure LLM credentials.
+    """
+
+    def __init__(self, provider: str, reason: str, fix_hint: str | None = None) -> None:
+        """
+        Initialize LLM configuration error.
+
+        Args:
+            provider: LLM provider name (e.g., "OpenAI", "Anthropic", "LiteLLM")
+            reason: Why the configuration is invalid
+            fix_hint: Optional hint on how to fix the issue
+
+        """
+        message = f"LLM configuration error ({provider}): {reason}"
+        if fix_hint:
+            message += f"\nHow to fix: {fix_hint}"
+
+        super().__init__(
+            message=message,
+            details={"provider": provider, "reason": reason, "fix_hint": fix_hint or ""},
+        )
+        self.provider = provider
+        self.reason = reason
+        self.fix_hint = fix_hint
+
+
 # Service availability exceptions
 class ServiceUnavailableError(ApplicationError):
     """Raised when service or dependency is unavailable."""

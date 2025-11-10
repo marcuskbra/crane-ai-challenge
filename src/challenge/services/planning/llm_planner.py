@@ -16,8 +16,9 @@ from typing import Any
 
 import litellm
 from litellm import cost_per_token
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from challenge.core.exceptions import LLMConfigurationError, PlanGenerationError
 from challenge.domain.models.plan import Plan
 from challenge.services.planning.examples import ALL_EXAMPLES, format_example_for_prompt
 from challenge.services.planning.planner import PatternBasedPlanner
@@ -56,19 +57,6 @@ class LLMRequestParams(BaseModel):
         validate_assignment=True,
         strict=True,
         extra="allow",  # Allow extra fields from LiteLLM
-    )
-
-
-class LLMResponseData(BaseModel):
-    """Response data from LLM with usage information."""
-
-    usage: LLMUsage | None = Field(default=None, description="Token usage information")
-    model: str | None = Field(default=None, description="Model that generated the response")
-
-    model_config = ConfigDict(
-        validate_assignment=True,
-        strict=True,
-        extra="allow",  # Allow extra fields from provider responses
     )
 
 
@@ -218,6 +206,10 @@ def log_llm_failure(kwargs: dict[str, Any], response_obj: Any, start_time: Any, 
     - Request parameters
     - Failure timestamp
 
+    NOTE: This callback logs ALL LLM failures, but not all failures use fallback.
+    Configuration errors (AuthenticationError, InvalidRequestError) will fail loudly.
+    Only transient errors (RateLimitError, ServiceUnavailableError) use fallback.
+
     Args:
         kwargs: Request parameters passed to LiteLLM (raw dict from external library)
         response_obj: Response/error object from LLM provider
@@ -229,10 +221,9 @@ def log_llm_failure(kwargs: dict[str, Any], response_obj: Any, start_time: Any, 
         # Parse request parameters into typed model
         request_params = _parse_request_params(kwargs)
         error_message = str(response_obj) if response_obj else "Unknown error"
+        error_type = response_obj.__class__.__name__ if response_obj else "Unknown"
 
-        logger.error(
-            f"LLM FAILURE: model={request_params.model}, error={error_message}, will_fallback_to_pattern_planner=True"
-        )
+        logger.error(f"LLM FAILURE: model={request_params.model}, error_type={error_type}, error={error_message}")
 
     except Exception as e:
         logger.warning(f"Error in LLM failure callback: {e}")
@@ -579,23 +570,80 @@ class LLMPlanner:
 
             return Plan.model_validate(plan_dict)
 
+        except (
+            litellm.AuthenticationError,
+            litellm.InvalidRequestError,
+            litellm.NotFoundError,
+            litellm.ContentPolicyViolationError,
+        ) as e:
+            # Configuration errors - FAIL LOUDLY (don't use fallback)
+            provider = self.model.split("/")[0] if "/" in self.model else "LiteLLM"
+            error_msg = str(e)[:200]
+
+            # Provide helpful fix hints based on error type
+            if isinstance(e, litellm.AuthenticationError):
+                fix_hint = (
+                    "Set LLM_API_KEY in your .env file with a valid API key. "
+                    "For OpenAI: get key from https://platform.openai.com/api-keys. "
+                    "For Anthropic: get key from https://console.anthropic.com/settings/keys"
+                )
+            elif isinstance(e, litellm.NotFoundError):
+                fix_hint = f"Check LLM_MODEL in .env. Model '{self.model}' may not exist or you may lack access."
+            elif isinstance(e, litellm.ContentPolicyViolationError):
+                fix_hint = "Your prompt violates the LLM provider's content policy. Modify your request."
+            else:
+                fix_hint = "Check your .env configuration: LLM_PROVIDER, LLM_MODEL, and LLM_API_KEY"
+
+            logger.error(
+                f"LLM CONFIGURATION ERROR - DO NOT USE FALLBACK: "
+                f"provider={provider}, error={error_msg}, fix_hint={fix_hint}"
+            )
+
+            raise LLMConfigurationError(provider=provider, reason=error_msg, fix_hint=fix_hint) from e
+
+        except (
+            litellm.RateLimitError,
+            litellm.ServiceUnavailableError,
+            litellm.InternalServerError,
+            litellm.APIConnectionError,
+        ) as e:
+            # Transient errors - use fallback (these are temporary service issues)
+            error_msg = str(e)[:150]
+            logger.warning(
+                f"LLM temporary failure (will use pattern-based fallback): "
+                f"error_type={e.__class__.__name__}, error={error_msg}"
+            )
+            return self.fallback.create_plan(prompt)
+
         except json.JSONDecodeError as e:
-            # Log the problematic JSON for debugging
+            # JSON parsing errors - likely a model issue, use fallback
             raw_content = response.choices[0].message.content if "response" in locals() else "N/A"
             cleaned_content = content if "content" in locals() else "N/A"
             logger.error(
-                f"JSON parsing failed: {e!s}\n"
+                f"JSON parsing failed (model returned invalid JSON): {e!s}\n"
                 f"Raw content: {raw_content[:1000]}\n"
                 f"Cleaned content: {cleaned_content[:1000]}"
             )
-            logger.warning("LLM planning failed (invalid JSON), using pattern-based fallback")
+            logger.warning("LLM planning failed (invalid JSON from model), using pattern-based fallback")
+            return self.fallback.create_plan(prompt)
+
+        except ValidationError as e:
+            # Pydantic validation errors - model returned wrong schema, use fallback
+            raw_content = response.choices[0].message.content if "response" in locals() else "N/A"
+            plan_dict_str = json.dumps(plan_dict) if "plan_dict" in locals() else "N/A"
+            logger.error(
+                f"Schema validation failed (model returned invalid plan structure): {e!s}\n"
+                f"Raw content: {raw_content[:500]}\n"
+                f"Parsed plan: {plan_dict_str[:500]}"
+            )
+            logger.warning("LLM planning failed (invalid plan schema from model), using pattern-based fallback")
             return self.fallback.create_plan(prompt)
 
         except Exception as e:
-            # Log error and fall back to pattern-based planner
-            logger.error(f"LLM FAILURE: model={self.model}, error={e.__class__.__name__}: {str(e)[:150]}")
-            logger.warning(f"LLM planning failed ({e.__class__.__name__}), using pattern-based fallback")
-            return self.fallback.create_plan(prompt)
+            # Unknown errors - don't use fallback, re-raise with context
+            error_msg = f"{e.__class__.__name__}: {str(e)[:200]}"
+            logger.error(f"Unexpected LLM error (not using fallback): {error_msg}")
+            raise PlanGenerationError(prompt=prompt[:100], reason=error_msg) from e
 
     def _system_prompt(self, is_ollama: bool = False) -> str:
         """

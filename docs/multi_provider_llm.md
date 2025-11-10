@@ -13,7 +13,8 @@ models for development to powerful cloud models for production.
 | ✅ **Cost Optimization**   | Route simple tasks to cheap models, complex to powerful ones |
 | ✅ **Offline development** | Work without internet using local Ollama models              |
 | ✅ **Easy switching**      | Toggle between providers via environment variables           |
-| ✅ **Fallback resilience** | Automatic degradation to pattern-based on LLM failure        |
+| ⚠️ **Configuration required** | Missing/invalid credentials will fail loudly, not fall back  |
+| ✅ **Transient fallback**  | Pattern-based fallback for rate limits, service outages only |
 
 ## Quick Start with Local Models (Ollama)
 
@@ -143,6 +144,74 @@ docker-compose -f docker-compose.litellm.yml logs -f litellm
 | Cost per 1K runs | $0.30       | $0                 |
 | Accuracy         | 99%         | 97%                |
 | Offline capable  | ❌           | ✅                  |
+
+## ⚠️ Configuration Requirements & Fallback Behavior
+
+**IMPORTANT**: LLM configuration is **required** for the application to run. Missing or invalid credentials will cause the application to fail loudly with clear error messages.
+
+### Configuration Validation
+
+The application validates LLM configuration at startup and during plan creation. You must configure **one of the following**:
+
+1. **Cloud Provider** (OpenAI, Anthropic):
+   - Valid `LLM_API_KEY` starting with `sk-`
+   - Proper `LLM_MODEL` for the selected provider
+   - `LLM_PROVIDER` set to `openai` or `anthropic`
+
+2. **Local LLM** (Ollama):
+   - `LLM_BASE_URL` set to your local LLM endpoint (e.g., `http://localhost:11434/v1`)
+   - `LLM_MODEL` set to your local model (e.g., `qwen2.5:3b`)
+   - `LLM_API_KEY` automatically set to dummy value (or can be omitted)
+
+### Verify Configuration
+
+After setting up your `.env` file, verify your configuration:
+
+```bash
+# Verify LLM credentials are properly configured
+make llm-config-check
+
+# Example success output:
+# ✅ Cloud provider configured:
+#    MODEL: gpt-4o-mini
+#    API_KEY: sk-...abc123 (last 4 chars)
+```
+
+### Fallback Behavior
+
+**Pattern-based fallback is ONLY used for transient errors:**
+
+| Error Type | Behavior | Example |
+|------------|----------|---------|
+| ❌ **Configuration** | **Fail loudly** | Missing API key, invalid credentials, model not found |
+| ✅ **Transient** | Use fallback | Rate limit exceeded, service temporarily unavailable |
+| ✅ **Model error** | Use fallback | Invalid JSON response, schema validation failure |
+
+**Configuration errors will raise `LLMConfigurationError`:**
+```python
+# Missing API key
+raise LLMConfigurationError(
+    provider="OpenAI",
+    reason="Invalid API key",
+    fix_hint="Set LLM_API_KEY in your .env file with a valid API key from https://platform.openai.com/api-keys"
+)
+```
+
+**Transient errors will fall back to pattern-based planning:**
+```python
+# Rate limit
+logger.warning("LLM temporary failure (will use pattern-based fallback): RateLimitError")
+return self.fallback.create_plan(prompt)
+```
+
+### Why Fail Loudly?
+
+The application intentionally fails on configuration errors to:
+
+1. **Force proper setup**: Developers must configure LLM credentials correctly
+2. **Prevent silent degradation**: No unexpected pattern-based fallback in production
+3. **Clear error messages**: Helpful hints on how to fix configuration issues
+4. **Production readiness**: Ensure LLM is actually working before deployment
 
 ## Complete Guide
 
