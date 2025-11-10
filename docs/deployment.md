@@ -14,12 +14,13 @@ cp .env.example .env
 **Key Configuration Options:**
 
 ```bash
-# LLM Configuration (optional - uses pattern-based fallback if not set)
+# LLM Configuration (REQUIRED - fails loudly if not configured)
+# Pattern-based fallback only used for transient errors (rate limits, service outages)
 # Primary configuration (LiteLLM multi-provider support)
-LLM_API_KEY=sk-your-api-key-here
+LLM_API_KEY=sk-your-api-key-here         # Required for cloud providers (OpenAI, Anthropic)
 LLM_MODEL=gpt-4o-mini                    # or claude-3-5-sonnet-20241022, qwen2.5:3b
 LLM_TEMPERATURE=0.1
-LLM_BASE_URL=                            # Optional: http://localhost:11434/v1 for Ollama
+LLM_BASE_URL=                            # For local LLM: http://localhost:11434/v1 (Ollama)
 LLM_PROVIDER=openai                      # openai, anthropic, or ollama
 
 # Backward compatible (deprecated - use LLM_* above)
@@ -38,6 +39,16 @@ LOG_LEVEL=INFO
 MAX_RETRIES=3           # Retry attempts for failed steps
 STEP_TIMEOUT=30.0       # Timeout in seconds for each step execution
 ```
+
+**Verify LLM Configuration:**
+
+After setting up your `.env` file, verify your LLM credentials:
+
+```bash
+make llm-config-check
+```
+
+See [Multi-Provider LLM Setup](./multi_provider_llm.md) for detailed configuration instructions and troubleshooting.
 
 **Timeout Configuration:**
 
